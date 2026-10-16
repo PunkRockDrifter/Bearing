@@ -344,3 +344,6 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .legend__row--current{background:var(--brg-accent-wash);box-shadow:inset 3px 0 0 var(--brg-accent)}
 .legend__row--current .legend__sub{color:var(--brg-ink-2)}
 .legend__row--current .legend__tag{color:var(--brg-accent)}
+
+/* Back and Next sit side by side: same height, same minimum width, same text size */
+.nav .back,.nav .btn{box-sizing:border-box;min-height:52px;min-width:120px;padding-block:0;padding-inline:20px;font-size:17px;font-weight:600;justify-content:center}
