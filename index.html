@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bearing</title>
+<meta name="description" content="Work out a career direction you'd enjoy and be good at, without starting from your job history.">
+<meta name="theme-color" content="#E8EBE3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121A15" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="style.css">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} [hidden]{display:none!important}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>window.BEARING_HOSTED = true;</script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="jobs2.js"></script>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator && !window.BEARING_ANDROID) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>

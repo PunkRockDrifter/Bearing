@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Signing comes from environment variables set by the GitHub workflow.
+// Without them the build falls back to Android's debug key (fine for testing).
+def keystoreFile = System.getenv('KEYSTORE_FILE')
+
+android {
+    namespace 'au.bearing.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'au.bearing.app'
+        minSdk 24
+        targetSdk 34
+        versionCode((System.getenv('VERSION_CODE') ?: '1').toInteger())
+        versionName '1.0.' + (System.getenv('VERSION_CODE') ?: '0')
+    }
+
+    signingConfigs {
+        release {
+            if (keystoreFile) {
+                storeFile file(keystoreFile)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS') ?: 'bearing'
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystoreFile ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

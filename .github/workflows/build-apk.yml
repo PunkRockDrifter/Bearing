@@ -1,0 +1,72 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.KEYSTORE_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Bundle the web app into the APK
+        run: |
+          W=android/app/src/main/assets/www
+          mkdir -p "$W"
+          cp index.html style.css config.js data.js jobs2.js app.js manifest.webmanifest privacy.html "$W"/
+          cp -r icons fonts "$W"/
+          # Mark this copy as running inside the Android app
+          sed -i 's#<script>window.BEARING_HOSTED = true;</script>#<script>window.BEARING_HOSTED = true; window.BEARING_ANDROID = true;</script>#' "$W/index.html"
+
+      - name: Point app links at your site
+        run: |
+          HOST=$(sed -n "s#.*BEARING_SHARE_BASE *= *'https\{0,1\}://\([^/']*\).*#\1#p" config.js | head -1)
+          LPATH=$(sed -n "s#.*BEARING_SHARE_BASE *= *'https\{0,1\}://[^/']*\(/[^']*\)'.*#\1#p" config.js | head -1); LPATH="${LPATH%/}"; LPATH="${LPATH:-/}"
+          sed -i -e "s#__LINK_HOST__#${HOST:-links.invalid}#" -e "s#__LINK_PATH__#${LPATH}#" android/app/src/main/AndroidManifest.xml
+
+      - name: Load the signing key
+        if: env.HAS_KEY == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/bearing.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/bearing.jks" >> "$GITHUB_ENV"
+
+      - name: Build the APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle -p android assembleRelease --no-daemon
+
+      - name: Publish to the Releases page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk Bearing.apk
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest Bearing.apk \
+            --target "$GITHUB_SHA" \
+            --title "Bearing for Android (latest build)" \
+            --notes "Build ${{ github.run_number }} from commit ${GITHUB_SHA::7}. On your phone, tap Bearing.apk to download, then open it to install." \
+            --prerelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bearing-apk
+          path: Bearing.apk
