@@ -292,7 +292,7 @@ let lastView='';
 function render(){
   // Only jump to the top when moving to a different screen; tapping a chip on the same screen keeps your place.
   const view = S.phase+':'+S.idx, y = window.scrollY;
-  let html = (S.phase==='intro' ? CONTOURS : '') + topbar();
+  let html = (S.phase==='intro' ? CONTOURS : '') + topbar() + incomingBanner();
   if(S.phase==='intro') html += intro();
   else if(S.phase==='settings') html += settings();
   else if(S.phase==='words') html += words();
@@ -401,6 +401,16 @@ function partStatus(){
     } else if(reach>at[at.length-1]){ out[p]={state:'done'}; }
   }
   return out;
+}
+/* In a browser, a friend's reply or results link should end up in the app, not in the browser's own storage. */
+function incomingBanner(){
+  if(!INCOMING || ANDROID) return '';
+  const what = INCOMING.k==='friend' ? 'Your friend’s answers are ready.' : 'These results are ready.';
+  const href = 'bearing://open?'+INCOMING.k+'='+encodeURIComponent(INCOMING.v);
+  return `<section class="card-dashed" style="margin:12px 16px"><div class="kicker">Open in the app</div><h2>${what}</h2>
+    <p>Tap the button to add them to your Bearing app. If nothing happens, open this page in your phone’s browser (the ⋯ menu) and try again.</p>
+    <a class="btn" href="${href}">Open in the Bearing app</a>
+    ${APK_URL ? `<p style="margin-top:12px"><a href="${esc(APK_URL)}">Don’t have the app? Download it</a></p>` : ''}</section>`;
 }
 function intro(){
   const inProgress = (S.phase==='intro') && (Object.keys(S.stories).length || Object.keys(S.pairs).length);
@@ -911,9 +921,11 @@ async function onClick(e){
 // "resume" returns to whichever round was in progress
 const _onClick = onClick;
 function mergePending(){ (S.pendingFriends||[]).forEach(d=>S.friends.push({data:d})); S.pendingFriends=[]; }
+let INCOMING = null;
 function handleLink(){
   if(!HOSTED) return;
   const q = new URLSearchParams(location.search); let used=false;
+  if(!ANDROID){ for(const k of ['friend','profile']){ if(q.has(k)) INCOMING={k, v:q.get(k)}; } }
   if(q.has('describe')){ F=freshF(); F.for=(q.get('describe')||'').slice(0,40); const rp=(q.get('reply')||'').trim(); if(okEmail(rp)) F.reply=rp; F.lock=!!(F.for||F.reply); S.phase='friend'; S.idx=0; used=true; }
   if(q.has('friend')){ const r=decode(q.get('friend')); used=true;
     if(r && r.kind==='friend'){ if(S.done){ S.friends.push({data:r.data}); S.phase='results'; setTimeout(()=>toast(`${r.data.by||'Your friend'}\u2019s view added`),300); }

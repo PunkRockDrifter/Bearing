@@ -29,6 +29,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="__LINK_HOST__" android:pathPrefix="__LINK_PATH__" />
             </intent-filter>
+
+            <!-- bearing://open?friend=... : used by the "Open in the Bearing app" button on the website. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="bearing" android:host="open" />
+            </intent-filter>
         </activity>
 
         <provider

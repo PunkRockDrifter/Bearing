@@ -82,7 +82,9 @@ public class MainActivity extends Activity {
     /** An https link to our own site (invite, friend reply, results) becomes the same query on the bundled page. */
     private String linkTarget(Intent intent) {
         Uri d = intent == null ? null : intent.getData();
-        if (d == null || !"https".equals(d.getScheme()) || HOST.equals(d.getHost())) return null;
+        if (d == null) return null;
+        boolean ours = "bearing".equals(d.getScheme()) || ("https".equals(d.getScheme()) && !HOST.equals(d.getHost()));
+        if (!ours) return null;
         String q = d.getEncodedQuery();
         return q == null ? START : START + "?" + q;
     }
