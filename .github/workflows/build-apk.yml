@@ -51,8 +51,8 @@ jobs:
       - name: Build the APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          VERSION_CODE: ${{ github.run_number }}
-        run: gradle -p android assembleRelease --no-daemon
+        # Offset by 100 so these builds always outrank the early test builds made by hand.
+        run: VERSION_CODE=$((GITHUB_RUN_NUMBER + 100)) gradle -p android assembleRelease --no-daemon
 
       - name: Publish to the Releases page
         env:
