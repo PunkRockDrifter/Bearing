@@ -479,9 +479,9 @@ function question(){
       const steps = fr ? [[L[0],'\u2190','This one'],[R[0],'\u2192','This one']]
         : weighted ? [[L[0].toUpperCase(),'\u2190\u2190','Much rather'],[L[0],'\u2190','Rather'],['both','=','Equal'],[R[0],'\u2192','Rather'],[R[0].toUpperCase(),'\u2192\u2192','Much rather']]
         : [[L[0],'\u2190','Rather this'],['both','=','Equal'],[R[0],'\u2192','Rather this']];
-      body = `<section class="screen"><div class="q">${q}</div><p class="hint">Tap a card, or use the scale to show how strongly you lean.</p>
+      body = `<section class="screen"><div class="q">${q}</div><p class="hint">${fr ? `Tap the one ${esc(nm())} would enjoy more. Skip it if you can\u2019t tell.` : 'Tap a card, or use the row below to show how strongly you lean.'}</p>
         <div class="pair">${[L,R].map(([k,v],n)=>`${n?'<span class="pair-or" aria-hidden="true">or</span>':''}<button class="opt" data-act="pick" data-id="${it.id}" data-v="${k}" aria-pressed="${lean===k}">${esc(v[1])}</button>`).join('')}</div>
-        <div class="pairscale" role="group" aria-label="How strongly you lean" style="--n:${steps.length}">${steps.map(([v,ic,l])=>`<button data-act="pick" data-id="${it.id}" data-v="${v}" aria-pressed="${cur===v}"><span class="ic" aria-hidden="true">${ic}</span><span>${l}</span></button>`).join('')}</div>
+        ${fr ? '' : `<div class="pairscale" role="group" aria-label="How strongly you lean" style="--n:${steps.length}">${steps.map(([v,ic,l])=>`<button data-act="pick" data-id="${it.id}" data-v="${v}" aria-pressed="${cur===v}"><span class="ic" aria-hidden="true">${ic}</span><span>${l}</span></button>`).join('')}</div>`}
         <div class="pair-alt">${fr ? `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="skip" aria-pressed="${cur==='skip'}">Skip</button>`
           : `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="none" aria-pressed="${cur==='none'}">Neither appeals</button>`}</div></section>
         <div class="nav">${back}<button class="btn ghost" data-act="next" ${cur?'':'disabled'}>Next</button></div>`; break; }
