@@ -432,6 +432,7 @@ function intro(){
     <p class="privacy">Everything stays on this device. Nothing is sent anywhere, and no AI is involved unless you opt in. <button class="linkbtn" data-act="settings">Settings</button></p>
     ${S.pendingProfile ? `<div class="card-dashed pending"><div class="kicker">Shared with you</div><h2>You opened someone’s results</h2><p>Opening them replaces the results saved on this device.</p><button class="btn" data-act="open-pending">Open their results</button><button class="btn ghost" data-act="drop-pending" style="margin-top:10px">Not now</button></div>` : ''}
   </section>
+  <details class="more-options"><summary>Other options: describe a friend, or reopen results with a code</summary>
   <section class="cards">
     <div class="card-dashed"><div class="kicker">Second opinion</div><h2>Answering for a friend?</h2>
       <p>If someone asked you to describe them, start here. It takes about ${minsOf(friendScreens())} minutes, and you’ll get ${LINKS?'a link':'a code'} to send back to them.</p>
@@ -440,7 +441,7 @@ function intro(){
       <label for="code-in">Paste a results code to reopen results, or a friend’s code to add their view.</label>
       <textarea id="code-in" class="codebox" rows="3" placeholder="BRG-P1… or BRG-F1…"></textarea>
       <button class="btn ghost" data-act="load-code">Load code</button></div>
-  </section></main>`;
+  </section></details></main>`;
 }
 
 function progressBar(list){
@@ -467,6 +468,7 @@ function question(){
       const s2=(S.stories2||{})[it.id];
       body = `<section class="screen"><div class="q">${esc(it.q)}</div><p class="hint">Pick the closest. If a second one is also true, tap it too.</p><div class="opts">${opts.map(t=>{ const main=S.stories[it.id]===t, also=s2===t;
           return `<button class="opt ${also?'also':''}" data-act="story" data-id="${it.id}" data-v="${t}" aria-pressed="${main||also}">${esc(it.opts[t])}${main&&s2?'<span class="tag">Closest</span>':''}${also?'<span class="tag">Also</span>':''}</button>`; }).join('')}</div>
+        ${it.none ? `<div class="pair-alt"><button class="chipbtn" data-act="story-none" data-id="${it.id}" aria-pressed="${S.stories[it.id]==='none'}">${esc(it.none)}</button></div>` : ''}
         ${SET.ai ? `<details class="saymore" ${S.storyText[it.id]?'open':''}><summary>Add it in your own words (optional, used by the AI coach)</summary><textarea id="st-${it.id}" placeholder="Who, what, why it stuck with you…">${esc(S.storyText[it.id]||'')}</textarea></details>` : ''}</section>
         <div class="nav">${back}<button class="btn" data-act="next" ${S.stories[it.id]?'':'disabled'}>Next</button></div>`; break; }
     case 'pair': case 'fpair': {
@@ -648,10 +650,11 @@ function jobDetail(o){
     <div><div class="lbl">How people get in</div><p>${esc(j.path)}</p></div>
     <div><div class="lbl">Courses that lead here</div><div class="links">
       <a href="https://www.google.com/search?q=${encodeURIComponent((j.cq||COURSE_Q[j.t]||j.t)+' course Australia')}" target="_blank" rel="noopener">Search \u201c${esc(j.cq||COURSE_Q[j.t]||j.t)}\u201d courses \u2197</a>
-      ${j.q>=3 ? `<a href="https://www.courseseeker.edu.au/" target="_blank" rel="noopener">University courses: Course Seeker \u2197</a>` : `<a href="https://www.yourcareer.gov.au/learn-and-train/courses" target="_blank" rel="noopener">TAFE and VET courses: Your Career \u2197</a>`}</div></div>
+      ${j.q>=3 ? `<a href="https://www.courseseeker.edu.au/courses?q=${encodeURIComponent(j.cq||COURSE_Q[j.t]||j.t)}" target="_blank" rel="noopener">University courses: Course Seeker \u2197</a>` : `<a href="https://www.yourcareer.gov.au/learn-and-train/courses?q=${encodeURIComponent(j.cq||COURSE_Q[j.t]||j.t)}" target="_blank" rel="noopener">TAFE and VET courses: Your Career \u2197</a>`}</div></div>
     ${j.aka&&j.aka.length ? `<div><div class="lbl">Also advertised as</div><div class="aka">${j.aka.map(a=>`<a href="https://www.seek.com.au/${a.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-jobs/in-All-Australia" target="_blank" rel="noopener">${esc(a)}</a>`).join('')}</div></div>` : ''}
     <div class="links"><a class="primary" href="https://www.seek.com.au/${slug}-jobs/in-All-Australia" target="_blank" rel="noopener">Live listings on SEEK ↗</a>
-      <a href="https://www.jobsandskills.gov.au/data/occupation-and-industry-profiles" target="_blank" rel="noopener">Official pay and outlook ↗</a></div></div>`;
+      <a href="https://www.jobsandskills.gov.au/data/occupation-and-industry-profiles" target="_blank" rel="noopener">Official pay and outlook ↗</a></div>
+    <div><button class="btn ghost sm" data-act="open" data-v="${esc(j.t)}">Close ${esc(j.t)}</button></div></div>`;
 }
 function chip(o){ const open = S.open===o.j.t; return `<button class="jobchip" data-act="open" data-v="${esc(o.j.t)}" aria-expanded="${open}">${esc(o.j.t)}<small>$${o.j.pay[0]}–${o.j.pay[1]}k${o.ready?' · '+READY[o.ready.lvl].toLowerCase():''}</small></button>`; }
 function tierBoard(scored){
@@ -660,16 +663,16 @@ function tierBoard(scored){
     return `<div class="tier"><div class="lab" style="background:var(--t${t})">${tierLab(t)}</div><div class="jobs">
       ${list.length ? (showAll ? (()=>{ const cut = t==='C' && !S.showC && list.length>16; const shown = cut ? list.slice(0,16) : list;
           if(cut && openOne && !shown.includes(openOne)) shown.push(openOne);
-          return `<div class="chips">${shown.map(chip).join('')}${cut?`<button class="chipbtn" data-act="show-c">Show ${list.length-shown.length} more</button>`:''}</div>`; })()
+          return `<div class="chips">${shown.map(o=>chip(o)+(o===openOne?jobDetail(o):'')).join('')}${cut?`<button class="chipbtn" data-act="show-c">Show ${list.length-shown.length} more</button>`:''}</div>`; })()
         : `<button class="chipbtn" data-act="show-d">Show ${list.length} unlikely fits</button>`) : `<span class="tier-empty">None here</span>`}
-      ${openOne && showAll ? jobDetail(openOne) : ''}</div></div>`; }).join('')}</div>`;
+      </div></div>`; }).join('')}</div>`;
 }
 function fieldBoard(scored){
   const byField={}; scored.filter(o=>o.tier!=='D').forEach(o=>(byField[o.j.f]=byField[o.j.f]||[]).push(o));
   const fields=Object.keys(byField).sort((a,b)=>byField[b][0].total-byField[a][0].total);
   return `<div class="panel" style="padding-block:4px">${fields.map(f=>`<div class="field"><div><h3>${FIELDS[f].name}</h3><p class="muted" style="margin:2px 0 0;font-size:15px">${FIELDS[f].blurb}</p></div>
-    <div class="chips">${byField[f].map(o=>`<button class="jobchip" data-act="open" data-v="${esc(o.j.t)}" aria-expanded="${S.open===o.j.t}"><span><span class="tb" style="background:var(--t${o.tier})">${TIER_NAME[o.tier].split(' ')[0]}</span>${esc(o.j.t)}</span><small>$${o.j.pay[0]}–${o.j.pay[1]}k</small></button>`).join('')}</div>
-    ${byField[f].filter(o=>o.j.t===S.open).map(jobDetail).join('')}</div>`).join('')}</div>`;
+    <div class="chips">${byField[f].map(o=>`<button class="jobchip" data-act="open" data-v="${esc(o.j.t)}" aria-expanded="${S.open===o.j.t}"><span><span class="tb" style="background:var(--t${o.tier})">${TIER_NAME[o.tier].split(' ')[0]}</span>${esc(o.j.t)}</span><small>$${o.j.pay[0]}–${o.j.pay[1]}k</small></button>${S.open===o.j.t?jobDetail(o):''}`).join('')}</div>
+    </div>`).join('')}</div>`;
 }
 function traitRows(P){
   const f = P.friends.length ? P.friends : [];
@@ -738,13 +741,18 @@ function results(){
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
     <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${S.useHistory?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
+    <div class="optstrip" role="group" aria-label="Optional next steps"><span class="eyebrow">Optional</span>
+      ${!S.refineDone ? `<button class="chipbtn sm" data-act="jump" data-v="opt-refine">Refine it</button>` : ''}
+      <button class="chipbtn sm" data-act="jump" data-v="opt-friend">Ask a friend</button>
+      <button class="chipbtn sm" data-act="jump" data-v="ai-panel">AI coach</button>
+      <button class="chipbtn sm" data-act="jump" data-v="opt-share">Keep or share</button></div>
     <div class="payfilter"><div class="frow"><label for="minpay" class="eyebrow">Minimum pay</label><input type="range" id="minpay" min="0" max="160" step="10" value="${S.minPay||0}"><span id="paylabel" class="paylabel"></span></div>
       <div class="frow"><span class="eyebrow">Most training I\u2019d do</span><div class="chips">${TRAIN_OPTS.map(([v,l])=>`<button class="chipbtn sm" data-act="maxq" data-v="${v}" aria-pressed="${(S.maxQ??4)===v}">${l}</button>`).join('')}</div></div></div>
     <div id="board">${board()}</div>
   </section>
-  <section class="section"><h2>Next</h2><div class="actions">
-    ${!S.refineDone ? `<div class="panel"><h3>Refine it</h3><p>About ${minsOf(refineScreens())} more minutes: fifteen more trade-offs and three questions in your own words. It sharpens the direction.</p><button class="btn" data-act="refine">Start refining round</button></div>` : ''}
-    <div class="panel"><h3>Ask a friend</h3>${LINKS
+  <section class="section"><h2>Optional next steps</h2><div class="actions">
+    ${!S.refineDone ? `<div class="panel" id="opt-refine"><h3>Refine it</h3><p>About ${minsOf(refineScreens())} more minutes: fifteen more trade-offs and three questions in your own words. It sharpens the direction.</p><button class="btn" data-act="refine">Start refining round</button></div>` : ''}
+    <div class="panel" id="opt-friend"><h3>Ask a friend</h3>${LINKS
       ? `<p>Send an invite to someone who knows you well. They answer about ${minsOf(friendScreens())} minutes of questions about you, then send their answers back to you.</p>
          <label class="eyebrow" for="reply-in">Your email, so their answers come straight back to you (optional)</label>
          <input id="reply-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(S.replyEmail||'')}">
@@ -755,7 +763,7 @@ function results(){
     <div class="panel" id="ai-panel"><h3>AI coach</h3>${SET.ai
       ? `<p>Copies your results as a prompt you can paste into any AI chat for a fuller conversation about direction and next steps.</p><div class="cta-row"><button class="btn" data-act="copy-prompt">Copy prompt for an AI coach</button><button class="btn ghost" data-act="ai-words">${Object.values(S.storyText||{}).some(t=>t&&t.trim())?'Edit my words':'Add my own words'}</button></div>`
       : `<p>Optional. Turn it on to get a prompt you can paste into any AI chat. Nothing is sent from this app.</p><button class="btn ghost" data-act="settings">Turn on in Settings</button>`}</div>
-    <div class="panel"><h3>Keep or share</h3><p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
+    <div class="panel" id="opt-share"><h3>Keep or share</h3><p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
       <div class="cta-row"><button class="btn ghost sm" data-act="share-snap">${SHARE_ICON}Share my Bearing</button><button class="btn ghost sm" data-act="copy-profile">Copy code</button></div></div>
   </div></section>
   ${feedbackCard()}
@@ -793,7 +801,7 @@ MY RESULTS`);
   L.push('Personality (Mini-IPIP Big Five): '+TRAIT_ORDER.filter(k=>P.selfTraits[k]!==null).map(k=>`${TRAITS[k].name} ${P.selfTraits[k]>0.25?'high':P.selfTraits[k]<-0.25?'low':'middle'}`).join('; ')+'.');
   const cs = COND.filter(c=>P.cond[c.k]!==null&&Math.abs(P.cond[c.k])>=1).map(c=>(Math.abs(P.cond[c.k])>=2?'strongly: ':'')+(P.cond[c.k]>0?c.hi:c.lo));
   L.push('Working conditions I want: '+(cs.join('; ')||'no strong preferences')+'.');
-  const st = STORIES.map(s=>{ const t=S.stories[s.id]; const extra=S.storyText[s.id]; const t2=(S.stories2||{})[s.id]; return t ? `- ${s.q} -> ${s.opts[t]}${t2?` (also: ${s.opts[t2]})`:''}${extra?` (in my words: "${extra}")`:''}` : ''; }).filter(Boolean);
+  const st = STORIES.map(s=>{ const t=S.stories[s.id]; const extra=S.storyText[s.id]; const t2=(S.stories2||{})[s.id]; return t ? `- ${s.q} -> ${t==='none'?(s.none||'None of these'):s.opts[t]}${t2?` (also: ${s.opts[t2]})`:''}${extra?` (in my words: "${extra}")`:''}` : ''; }).filter(Boolean);
   L.push('\nStory answers:\n'+st.join('\n'));
   const deep = DEEP.map(d=>{ const a=S.refine.deep[d.id]; return a&&(a.text||a.tags.length) ? `- ${d.q} ${a.text?`"${a.text}"`:''}${a.tags.length?` [what mattered: ${a.tags.map(t=>DEEP_TAGS[t].toLowerCase()).join('; ')}]`:''}` : ''; }).filter(Boolean);
   if(deep.length) L.push('\nIn my own words:\n'+deep.join('\n'));
@@ -839,8 +847,10 @@ async function onClick(e){
     case 'show-results': S.phase='results'; save(); render(); break;
     case 'home': grabText(); if(S.phase==='words'){ S.phase='results'; save(); render(); break; } if(S.phase==='friend'){ S.phase = S.done?'results':'intro'; } else if(S.phase!=='results'){ S.resumePhase=S.phase; S.phase='intro'; } else S.phase='intro'; save(); render(); break;
     case 'next': next(); break;
+    case 'jump': { const el=document.getElementById(v); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); break; }
     case 'back': grabText(); S.idx=Math.max(0,S.idx-1); save(); render(); break;
-    case 'story': { grabText(); S.stories2=S.stories2||{}; const m=S.stories[id], a=S.stories2[id];
+    case 'story-none': { grabText(); S.stories[id]='none'; if(S.stories2) delete S.stories2[id]; save(); render(); setTimeout(next, 220); break; }
+    case 'story': { grabText(); S.stories2=S.stories2||{}; if(S.stories[id]==='none') delete S.stories[id]; const m=S.stories[id], a=S.stories2[id];
       if(m===v){ if(a){ S.stories[id]=a; delete S.stories2[id]; } else delete S.stories[id]; }
       else if(a===v){ delete S.stories2[id]; }
       else if(!m){ S.stories[id]=v; }
@@ -869,7 +879,7 @@ async function onClick(e){
     case 'view': S.view=v; save(); document.getElementById('board').innerHTML=board(); document.querySelectorAll('[data-act="view"]').forEach(x=>x.setAttribute('aria-pressed', String(x.dataset.v===v))); break;
     case 'show-c': S.showC=true; document.getElementById('board').innerHTML=board(); break;
     case 'show-d': S.showD=true; document.getElementById('board').innerHTML=board(); break;
-    case 'open': { S.open = S.open===v ? null : v; save(); document.getElementById('board').innerHTML=board(); if(S.open){ const el=document.getElementById('d-'+hash(v)); if(el && el.getBoundingClientRect().top>window.innerHeight*0.7) el.scrollIntoView({behavior:'smooth',block:'nearest'}); } break; }
+    case 'open': { S.open = S.open===v ? null : v; save(); document.getElementById('board').innerHTML=board(); if(S.open){ const el=document.getElementById('d-'+hash(v)); const chipEl=el&&el.previousElementSibling; const r=chipEl&&chipEl.getBoundingClientRect(); if(r && (r.top<0 || r.top>window.innerHeight*0.6)) chipEl.scrollIntoView({behavior:'smooth',block:'start'}); } else { const c=[...document.querySelectorAll('.jobchip')].find(b=>b.dataset.v===v); if(c){ const r=c.getBoundingClientRect(); if(r.top<0||r.bottom>window.innerHeight) c.scrollIntoView({behavior:'smooth',block:'center'}); } } break; }
     case 'friend-start': F=freshF(); S.prevPhase=S.phase; S.phase='friend'; S.idx=0; save(); render(); break;
     case 'copy': { const el=document.getElementById(b.dataset.src); copyText(el.value, el); break; }
     case 'copy-profile': { copyText(profileCode(), document.getElementById('fcode-in')); break; }

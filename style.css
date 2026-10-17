@@ -347,3 +347,13 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 
 /* Back and Next sit side by side: same height, same minimum width, same text size */
 .nav .back,.nav .btn{box-sizing:border-box;min-height:52px;min-width:120px;padding-block:0;padding-inline:20px;font-size:17px;font-weight:600;justify-content:center}
+
+/* Home: secondary options folded away */
+.more-options{margin-top:28px}
+.more-options>summary{cursor:pointer;font-weight:600;color:var(--brg-ink-2);padding:12px 0;list-style-position:inside}
+.more-options[open]>summary{margin-bottom:8px}
+/* Results: optional steps as a compact strip above the job list */
+.optstrip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 4px}
+.optstrip .eyebrow{margin-right:4px}
+/* Job details open in place, full width under the tapped job */
+.chips>.detail{flex-basis:100%;width:100%}

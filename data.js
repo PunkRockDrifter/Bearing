@@ -11,60 +11,66 @@ const ORDER = ['R','I','A','S','E','C'];
 
 /* Part 1: story questions (adapted from the themes of Savickas's Career Construction Interview) */
 const STORIES = [
-  { id:'s1', q:'Think of someone you looked up to growing up. Real or fictional, it doesn’t matter. What did you admire most about them?',
-    opts:{ R:'They could fix or build just about anything', I:'They always knew the answer, or how to find it', A:'They saw the world differently and made things from it',
-           S:'People felt better just being around them', E:'They made things happen and others followed them', C:'They were rock solid. Everything they touched was in order' } },
-  { id:'s2', q:'It’s 11pm and you’ve fallen into a video rabbit hole. Which one is it most likely to be?',
-    opts:{ R:'Someone restoring a rusted old tool or machine', I:'An unsolved mystery, or how something actually works', A:'An artist’s process, or a song being pulled apart',
-           S:'People who turned their lives around, and who helped them', E:'How someone built a business from nothing', C:'How an airport, a port or a kitchen keeps thousands of moving parts in sync' } },
-  { id:'s3', q:'Which kind of story do you keep coming back to, in books, films or shows?',
-    opts:{ R:'Survival. Someone, the wild, and what they can make with their hands', I:'A detective quietly piecing it together', A:'An outsider who finally makes the thing only they could make',
-           S:'A found family, or a mentor who changes someone’s life', E:'An underdog who builds an empire, or a crew pulling off a heist', C:'A meticulous plan where every piece clicks into place' } },
+  { id:'s1', q:'Think of someone you looked up to growing up, real or fictional. What did you admire most about them?',
+    none:'No one really comes to mind.',
+    opts:{ R:'They could fix or build just about anything.', I:'They always knew the answer, or how to find it.', A:'They saw things differently and created things of their own.',
+           S:'They made people feel looked after and understood.', E:'They took charge and made things happen.', C:'They were reliable and organised. You could always count on them.' } },
+  { id:'s2', q:'You have a spare half hour to watch or read anything you like. What are you most likely to pick?',
+    none:'None of these really appeal.',
+    opts:{ R:'Someone restoring an old car, tool or piece of furniture.', I:'How something works, or an unsolved mystery explained.', A:'A musician, artist or chef showing how they create.',
+           S:'Someone turning their life around, and the people who helped.', E:'How someone built a business from nothing.', C:'How a busy airport, port or warehouse runs like clockwork.' } },
+  { id:'s3', q:'When you choose a film, show or book, which kind of story do you enjoy most?',
+    none:'None of these. It depends on my mood.',
+    opts:{ R:'Survival: someone getting by with their own hands and skills.', I:'A mystery or investigation, piecing the clues together.', A:'A creative outsider making something only they could make.',
+           S:'A mentor or close group changing someone’s life for the better.', E:'An underdog building something big, or a crew pulling off a heist.', C:'A careful plan where every piece falls into place.' } },
   { id:'s4', q:'Which of these would you be most likely to write on a sticky note for yourself?',
-    opts:{ R:'Get your hands on it and try it', I:'Question everything', A:'Make something that wasn’t there before',
-           S:'Leave people better than you found them', E:'Fortune favours the bold', C:'A place for everything, and everything in its place' } },
-  { id:'s5', q:'Go back to an early memory, around age five to eight, where you were completely absorbed. Which is closest?',
-    opts:{ R:'Taking something apart, or building in the dirt', I:'Watching bugs, collecting things, asking “why?”', A:'Drawing, or making up games, songs and plays',
-           S:'Looking after a younger kid or an animal', E:'Running the game, or selling something to the neighbours', C:'Sorting a collection, or lining everything up just right' } },
-  { id:'s6', q:'You have a free Saturday and nobody needs anything from you. By 3pm you’re probably…',
-    opts:{ R:'In the shed, the garden or out on a trail', I:'Deep in an article, a documentary or a problem you can’t let go of', A:'Making something: music, a meal without a recipe, a sketch',
-           S:'Catching up with someone, or helping a mate move house', E:'Planning something bigger, or chasing a side project', C:'Sorting the house, the budget or next week’s plan' } }
+    none:'None of these sound like me.',
+    opts:{ R:'Get your hands on it and try it.', I:'Question everything.', A:'Make something that wasn’t there before.',
+           S:'Leave people better than you found them.', E:'Fortune favours the bold.', C:'A place for everything, and everything in its place.' } },
+  { id:'s5', q:'Think back to an early memory, around age five to eight, when you were completely absorbed in something. Which is closest?',
+    none:'I can’t remember, or none of these fit.',
+    opts:{ R:'Taking something apart, or building things outside.', I:'Watching bugs, collecting things and asking “why?”', A:'Drawing, or making up games, songs and plays.',
+           S:'Looking after a younger kid or an animal.', E:'Running the game, or selling something to the neighbours.', C:'Sorting a collection, or lining everything up just right.' } },
+  { id:'s6', q:'You have a free Saturday and nobody needs anything from you. By 3pm, what are you most likely doing?',
+    none:'Resting and doing nothing much, and loving it.',
+    opts:{ R:'Something active or hands-on: sport, a trail, the garden or the shed.', I:'Deep in an article, a documentary or a problem I can’t let go of.', A:'Making something: music, a meal without a recipe, or a sketch.',
+           S:'Catching up with friends, or helping a mate move house.', E:'Planning something bigger, or working on a side project.', C:'Sorting out the house, the budget or next week’s plan.' } }
 ];
 
 /* Part 2: forced choices. Every type meets every other type once. */
 const PAIRS = [
-  { id:'p1',  a:['R','Rebuild an old motorbike engine until it runs'], b:['I','Work out why one town floods every summer and the next town doesn’t'] },
-  { id:'p2',  a:['R','Build a timber boat from a set of plans'], b:['A','Design the poster and the whole look of a local music festival'] },
-  { id:'p3',  a:['R','Plant a thousand native trees on a burnt-out hillside'], b:['S','Teach an adult to read over a few months'] },
-  { id:'p4',  a:['R','Rig the stage and lights for an outdoor concert'], b:['E','Talk the council into approving that concert'] },
-  { id:'p5',  a:['R','Fix the fences on a cattle station'], b:['C','Set up the station’s stock and paddock records so nothing gets lost'] },
-  { id:'p6',  a:['I','Trace the source of a food poisoning outbreak'], b:['A','Write a short story that wins a local prize'] },
-  { id:'p7',  a:['I','Figure out why the bees vanished from one valley'], b:['S','Coach an under-12s team through a losing season'] },
-  { id:'p8',  a:['I','Test which of three ideas actually works'], b:['E','Pitch the winning idea to a room of investors'] },
-  { id:'p9',  a:['I','Decode a 100-year-old handwritten ship’s logbook'], b:['C','Catalogue a museum archive so anyone can find anything'] },
-  { id:'p10', a:['A','Compose the music for a short film'], b:['S','Help a family through a really hard week'] },
-  { id:'p11', a:['A','Invent a dish nobody has tasted before'], b:['E','Turn a struggling café into the busiest one in town'] },
-  { id:'p12', a:['A','Paint a mural on the side of a building'], b:['C','Build the minute-by-minute schedule for a three-day festival'] },
-  { id:'p13', a:['S','Settle a long-running fight between two neighbours'], b:['E','Negotiate a better deal out of a stubborn supplier'] },
-  { id:'p14', a:['S','Sit with a nervous patient before their surgery'], b:['C','Design the checklist that stops surgical mistakes'] },
-  { id:'p15', a:['E','Recruit and lead a crew for a big one-off job'], b:['C','Keep the books for a small business so it never gets a nasty surprise'] }
+  { id:'p1',  a:['R','Rebuild an old motorbike engine until it runs.'], b:['I','Work out why one town floods every summer and the next town doesn’t.'] },
+  { id:'p2',  a:['R','Build a timber boat from a set of plans.'], b:['A','Design the poster and the whole look of a local music festival.'] },
+  { id:'p3',  a:['R','Plant a thousand native trees on a burnt-out hillside.'], b:['S','Teach an adult to read over a few months.'] },
+  { id:'p4',  a:['R','Rig the stage and lights for an outdoor concert.'], b:['E','Talk the council into approving that concert.'] },
+  { id:'p5',  a:['R','Fix the fences on a cattle station.'], b:['C','Set up the station’s stock and paddock records so nothing gets lost.'] },
+  { id:'p6',  a:['I','Trace the source of a food poisoning outbreak.'], b:['A','Write a short story that wins a local prize.'] },
+  { id:'p7',  a:['I','Figure out why the bees vanished from one valley.'], b:['S','Coach an under-12s team through a losing season.'] },
+  { id:'p8',  a:['I','Test which of three ideas actually works.'], b:['E','Pitch the winning idea to a room of investors.'] },
+  { id:'p9',  a:['I','Decode a 100-year-old handwritten ship’s logbook.'], b:['C','Catalogue a museum archive so anyone can find anything.'] },
+  { id:'p10', a:['A','Compose the music for a short film.'], b:['S','Help a family through a really hard week.'] },
+  { id:'p11', a:['A','Invent a dish nobody has tasted before.'], b:['E','Turn a struggling café into the busiest one in town.'] },
+  { id:'p12', a:['A','Paint a mural on the side of a building.'], b:['C','Build the minute-by-minute schedule for a three-day festival.'] },
+  { id:'p13', a:['S','Settle a long-running fight between two neighbours.'], b:['E','Negotiate a better deal out of a stubborn supplier.'] },
+  { id:'p14', a:['S','Sit with a nervous patient before their surgery.'], b:['C','Design the checklist that stops surgical mistakes.'] },
+  { id:'p15', a:['E','Recruit and lead a crew for a big one-off job.'], b:['C','Keep the books for a small business so it never gets a nasty surprise.'] }
 ];
 const PAIRS_REFINE = [
-  { id:'q1',  a:['R','Service a light aircraft'], b:['I','Predict tomorrow’s storm track from today’s data'] },
-  { id:'q2',  a:['R','Weld a steel gate that will last fifty years'], b:['A','Photograph a country town for a book'] },
-  { id:'q3',  a:['R','Clear storm-damaged trees after a cyclone'], b:['S','Help an elderly man get his affairs in order'] },
-  { id:'q4',  a:['R','Fit out a campervan from bare metal'], b:['E','Sell fifty campervans'] },
-  { id:'q5',  a:['R','Lay a dry-stone wall by hand'], b:['C','Reconcile a warehouse stock count to the last item'] },
-  { id:'q6',  a:['I','Identify a plant nobody else can name'], b:['A','Design the look of a new board game'] },
-  { id:'q7',  a:['I','Reconstruct exactly how an accident happened'], b:['S','Support the person it happened to'] },
-  { id:'q8',  a:['I','Find out why one shop outsells its twin across town'], b:['E','Run a campaign that changes the result of a local vote'] },
-  { id:'q9',  a:['I','Investigate why a bridge keeps cracking'], b:['C','Keep the maintenance records that prove it’s safe'] },
-  { id:'q10', a:['A','Choreograph a dance for a school concert'], b:['S','Mentor an apprentice through their first year'] },
-  { id:'q11', a:['A','Design a shopfront people stop to look at'], b:['E','Open a market stall and grow it into a shop'] },
-  { id:'q12', a:['A','Style a room for a theatre set'], b:['C','Plan a road trip with every booking confirmed'] },
-  { id:'q13', a:['S','Run a support group for new parents'], b:['E','Start a local club and grow it to 200 members'] },
-  { id:'q14', a:['S','Show a newcomer around and introduce them to everyone'], b:['C','Set up a filing system an office will still use in ten years'] },
-  { id:'q15', a:['E','Close a deal on a handshake'], b:['C','Read the contract line by line before anyone signs'] }
+  { id:'q1',  a:['R','Service a light aircraft.'], b:['I','Predict tomorrow’s storm track from today’s data.'] },
+  { id:'q2',  a:['R','Weld a steel gate that will last fifty years.'], b:['A','Photograph a country town for a book.'] },
+  { id:'q3',  a:['R','Clear storm-damaged trees after a cyclone.'], b:['S','Help an elderly man get his affairs in order.'] },
+  { id:'q4',  a:['R','Fit out a campervan from bare metal.'], b:['E','Sell fifty campervans.'] },
+  { id:'q5',  a:['R','Lay a dry-stone wall by hand.'], b:['C','Reconcile a warehouse stock count to the last item.'] },
+  { id:'q6',  a:['I','Identify a plant nobody else can name.'], b:['A','Design the look of a new board game.'] },
+  { id:'q7',  a:['I','Reconstruct exactly how an accident happened.'], b:['S','Support the person it happened to.'] },
+  { id:'q8',  a:['I','Find out why one shop outsells its twin across town.'], b:['E','Run a campaign that changes the result of a local vote.'] },
+  { id:'q9',  a:['I','Investigate why a bridge keeps cracking.'], b:['C','Keep the maintenance records that prove it’s safe.'] },
+  { id:'q10', a:['A','Choreograph a dance for a school concert.'], b:['S','Mentor an apprentice through their first year.'] },
+  { id:'q11', a:['A','Design a shopfront people stop to look at.'], b:['E','Open a market stall and grow it into a shop.'] },
+  { id:'q12', a:['A','Style a room for a theatre set.'], b:['C','Plan a road trip with every booking confirmed.'] },
+  { id:'q13', a:['S','Run a support group for new parents.'], b:['E','Start a local club and grow it to 200 members.'] },
+  { id:'q14', a:['S','Show a newcomer around and introduce them to everyone.'], b:['C','Set up a filing system an office will still use in ten years.'] },
+  { id:'q15', a:['E','Close a deal on a handshake.'], b:['C','Read the contract line by line before anyone signs.'] }
 ];
 const FRIEND_PAIRS = ['p1','p3','p5','p6','p8','p10','p12','p13','p15'];
 
@@ -137,7 +143,7 @@ const SKILLS = [
   ['cust','Dealing with customers or the public'], ['care','Caring for people'], ['teach','Teaching or training others'], ['write','Writing reports or documents'],
   ['data','Spreadsheets and numbers'], ['it','Software, computers or IT'], ['money','Budgets and money'], ['sales','Selling or negotiating'],
   ['proj','Planning projects and schedules'], ['safety','Safety, rules and compliance'], ['research','Research and analysis'], ['design','Design or creative tools'],
-  ['remote','Working remote or in the field'], ['events','Events, hospitality or tourism']
+  ['remote','Remote or regional locations, out in the field (not working from home)'], ['events','Events, hospitality or tourism']
 ];
 const QUALS = ['No post-school qualification', 'Certificate III or IV / trade', 'Diploma', 'Bachelor degree', 'Postgraduate'];
 
