@@ -74,6 +74,46 @@ const PAIRS_REFINE = [
 ];
 const FRIEND_PAIRS = ['p1','p3','p5','p6','p8','p10','p12','p13','p15'];
 
+/* Part 2: O*NET Mini Interest Profiler (Mini-IP), 30 items, five per RIASEC type, in the published order
+   (Rounds, Ming, Cao, Song & Lewis, 2016). From the O*NET Career Exploration Tools by the U.S. Department of Labor,
+   Employment and Training Administration (USDOL/ETA), used under the O*NET Tools Developer License
+   (https://www.onetcenter.org/license_tools.html). Bearing changed only spelling (organisation) and layout;
+   USDOL/ETA has not approved, endorsed or tested these modifications.
+   Answers: 0 strongly dislike, 1 dislike, 2 unsure, 3 like, 4 strongly like; each type sums to 0-20. */
+const MINI_IP = [
+  { id:'m1', k:'R', t:'Build kitchen cabinets' },
+  { id:'m2', k:'I', t:'Develop a new medicine' },
+  { id:'m3', k:'A', t:'Write books or plays' },
+  { id:'m4', k:'S', t:'Help people with personal or emotional problems' },
+  { id:'m5', k:'E', t:'Manage a department within a large company' },
+  { id:'m6', k:'C', t:'Install software across computers on a large network' },
+  { id:'m7', k:'R', t:'Repair household appliances' },
+  { id:'m8', k:'I', t:'Study ways to reduce water pollution' },
+  { id:'m9', k:'A', t:'Compose or arrange music' },
+  { id:'m10', k:'S', t:'Give career guidance to people' },
+  { id:'m11', k:'E', t:'Start your own business' },
+  { id:'m12', k:'C', t:'Operate a calculator' },
+  { id:'m13', k:'R', t:'Assemble electronic parts' },
+  { id:'m14', k:'I', t:'Conduct chemical experiments' },
+  { id:'m15', k:'A', t:'Create special effects for movies' },
+  { id:'m16', k:'S', t:'Perform rehabilitation therapy' },
+  { id:'m17', k:'E', t:'Negotiate business contracts' },
+  { id:'m18', k:'C', t:'Keep shipping and receiving records' },
+  { id:'m19', k:'R', t:'Drive a truck to deliver packages to offices and homes' },
+  { id:'m20', k:'I', t:'Examine blood samples using a microscope' },
+  { id:'m21', k:'A', t:'Paint sets for plays' },
+  { id:'m22', k:'S', t:'Do volunteer work at a non-profit organisation' },
+  { id:'m23', k:'E', t:'Market a new line of clothing' },
+  { id:'m24', k:'C', t:'Inventory supplies using a hand-held computer' },
+  { id:'m25', k:'R', t:'Test the quality of parts before shipment' },
+  { id:'m26', k:'I', t:'Develop a way to better predict the weather' },
+  { id:'m27', k:'A', t:'Write scripts for movies or television shows' },
+  { id:'m28', k:'S', t:'Teach a high-school class' },
+  { id:'m29', k:'E', t:'Sell merchandise at a department store' },
+  { id:'m30', k:'C', t:'Stamp, sort, and distribute mail for an organisation' }
+];
+const MIP_SCALE = ['Strongly dislike','Dislike','Unsure','Like','Strongly like'];
+
 /* Part 3: Mini-IPIP (Donnellan et al., 2006), public-domain items from the International Personality Item Pool.
    Traits shown in plain language: ex social energy, wa warmth, or order, st steadiness, cu curiosity. */
 const IPIP = [

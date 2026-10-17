@@ -36,7 +36,7 @@ function decode(code){
 }
 
 /* ---------- state ---------- */
-function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, pairs:{}, ipip:{}, cond:{},
+function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, pairs:{}, mip:{}, ipip:{}, cond:{},
   exp:{ skills:[], q:null }, expSkipped:false, refine:{ pairs:{}, deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, minPay:0 }; }
 function freshF(){ return { for:'', by:'', pairs:{}, ipip:{}, cond:{}, text:'' }; }
 let S = fresh(), F = null;
@@ -88,8 +88,8 @@ function buildFeedback(){
       interests:Object.fromEntries(ORDER.map(t=>[t,r2(P.rel[t])])),
       traits:Object.fromEntries(TRAIT_ORDER.map(k=>[k,r2(P.selfTraits[k])])),
       conditions:Object.fromEntries(COND_KEYS.map(k=>[k,S.cond[k]??null])),
-      stories:S.stories, stories_also:S.stories2||{}, pairs:S.pairs, ratings:S.ipip,
-      refine: S.refineDone ? { pairs:S.refine.pairs, drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
+      stories:S.stories, stories_also:S.stories2||{}, pairs:S.pairs, activities:S.mip||{}, ratings:S.ipip,
+      refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
       history_used: !!S.useHistory, friends_added:(S.friends||[]).length,
@@ -118,15 +118,15 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify({S,F})); }catch(e
 function load(){ try{ const raw = localStorage.getItem(KEY); if(raw){ const o=JSON.parse(raw); if(o && o.S){ S=Object.assign(fresh(),o.S); F=o.F||null; } } }catch(e){} }
 
 /* ---------- screen lists ---------- */
-const SECS = {interlude:5, story:28, pair:10, ipip:30, cond:25, exp:45, roles:60, deep:60, drain:15, fname:20, fpair:10, fipip:30, fcond:30, ftext:30, fdone:0};
+const SECS = {interlude:5, story:28, pair:10, mip:25, ipip:30, cond:25, exp:45, roles:60, deep:60, drain:15, fname:20, fpair:10, fipip:30, fcond:30, ftext:30, fdone:0};
 const secsOf = list => list.reduce((a,x)=>a+(SECS[x.type]??10),0);
 const minsOf = list => Math.max(1, Math.round(secsOf(list)/60));
 function chunk(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
 function quickScreens(){
-  const s=[{type:'interlude', part:1, title:'Stories', text:'Six questions about the things you’re drawn to. There are no wrong answers and nothing here is about jobs. Go with your first instinct.'}];
+  const s=[{type:'interlude', part:1, title:'Stories', text:'Six questions about the things you’re drawn to. There are no wrong answers and nothing here is about jobs. They don’t change your matches; they get you thinking, and they come back with your results.'}];
   STORIES.forEach(it=>s.push({type:'story', item:it, part:1}));
-  s.push({type:'interlude', part:2, title:'Trade-offs', text:'Fifteen quick choices between two things you might do for a day. Skills don’t matter, so pick the one you’d come home happier from.'});
-  shuffle(PAIRS,'pairs').forEach(it=>s.push({type:'pair', item:it, set:'pairs', part:2}));
+  s.push({type:'interlude', part:2, title:'Activities', text:'Thirty work activities. Rate how much you’d enjoy doing each one. Don’t think about pay, training or whether you could do it yet.'});
+  chunk(MINI_IP,5).forEach(items=>s.push({type:'mip', items, part:2}));
   s.push({type:'interlude', part:3, title:'How you run', text:'Twenty short statements. Rate how much each sounds like you most of the time, not how you’d like to be.'});
   chunk(IPIP,5).forEach(items=>s.push({type:'ipip', items, part:3}));
   s.push({type:'interlude', part:4, title:'Conditions', text:'Where you’d sit between two ways a working day can go. The middle is fine if you genuinely don’t mind.'});
@@ -136,22 +136,21 @@ function quickScreens(){
   return s;
 }
 function refineScreens(){
-  const s=[{type:'interlude', part:1, title:'Refining round', text:'', refine:true}];
-  shuffle(PAIRS_REFINE,'refine').forEach(it=>s.push({type:'pair', item:it, set:'refine', part:1}));
-  DEEP.forEach(it=>s.push({type:'deep', item:it, part:2}));
-  s.push({type:'drain', part:3});
-  s[0].text = `Fifteen more trade-offs, three questions to answer in your own words, and one about what wears you out. About ${minsOf(s)} minutes.`;
+  const s=[{type:'interlude', part:1, title:'In your own words', text:'', refine:true}];
+  DEEP.forEach(it=>s.push({type:'deep', item:it, part:1}));
+  s.push({type:'drain', part:2});
+  s[0].text = `Three questions to answer in your own words, and one about what wears you out. They don’t change your matches. They give you, and the AI coach, more to work with. About ${minsOf(s)} minutes.`;
   return s;
 }
 function friendScreens(){
   const s=[{type:'fname'}];
-  FRIEND_PAIRS.map(id=>PAIRS.find(p=>p.id===id)).forEach(it=>s.push({type:'fpair', item:it}));
-  chunk(IPIP.filter(i=>i.f),5).forEach(items=>s.push({type:'fipip', items}));
-  s.push({type:'fcond'}); s.push({type:'ftext'}); s.push({type:'fdone'});
+  // Friends rate only traits others can see well (not steadiness, which people judge better in themselves).
+  chunk(IPIP.filter(i=>i.f && i.k!=='st'),4).forEach(items=>s.push({type:'fipip', items}));
+  s.push({type:'ftext'}); s.push({type:'fdone'});
   return s;
 }
 function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): []; }
-const PART_NAMES = { quick:['Stories','Trade-offs','How you run','Conditions','Experience'], refine:['Trade-offs','In your words','What drains you'] };
+const PART_NAMES = { quick:['Stories','Activities','How you run','Conditions','Experience'], refine:['In your words','What drains you'] };
 
 /* ---------- scoring ---------- */
 function relFrom(raw){
@@ -159,8 +158,15 @@ function relFrom(raw){
   const shifted = vals.map(v=>v-mn+0.0001); const sum = shifted.reduce((a,b)=>a+b,0);
   const o={}; ORDER.forEach((t,i)=>o[t]= sum>0 ? shifted[i]/sum : 1/6); return o;
 }
+const hasMip = st => !!(st.mip && Object.keys(st.mip).length);
 function selfRaw(st){
   const raw={R:0,I:0,A:0,S:0,E:0,C:0};
+  if(hasMip(st)){
+    MINI_IP.forEach(it=>{ const v=st.mip[it.id]; if(typeof v==='number') raw[it.k]+=v; });
+    if(st.useHistory) (st.roles||[]).forEach(r=>{ const v=roleVerdict(r); const d={fuel:1.5, skill:-1, again:0.75}[v.k]||0; (r.types||[]).forEach(t=>raw[t]+=d); });
+    return raw;
+  }
+  // Results saved before the Mini-IP: the original story and trade-off scoring.
   Object.values(st.stories).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=2; });
   Object.values(st.stories2||{}).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=1; });
   const scorePairs = (ans, list) => list.forEach(p=>{ const a=ans[p.id]; if(a==='a') raw[p.a[0]]+=2; else if(a==='b') raw[p.b[0]]+=2; else if(a==='A') raw[p.a[0]]+=3; else if(a==='B') raw[p.b[0]]+=3; else if(a==='both'){ raw[p.a[0]]+=1; raw[p.b[0]]+=1; } });
@@ -191,14 +197,13 @@ function profile(st){
   const self = relFrom(selfRaw(st));
   const fr = (st.friends||[]).map(f=>({ name:f.data.by||'A friend', rel: friendRaw(f.data) ? relFrom(friendRaw(f.data)) : null,
     traits: traitsFrom(f.data.ipip||{}, IPIP.filter(i=>i.f)), cond: f.data.cond||{}, text:f.data.text||'' }));
-  const w = fr.length ? 0.25 : 0;
-  const rel={}; ORDER.forEach(t=>{ const fv = fr.filter(f=>f.rel).map(f=>f.rel[t]); rel[t] = fv.length ? (1-w)*self[t] + w*mean(fv) : self[t]; });
-  const selfTraits = traitsFrom(st.ipip, IPIP);
-  const traits={}; TRAIT_ORDER.forEach(k=>{ const fv=fr.map(f=>f.traits[k]).filter(v=>v!==null); const s=selfTraits[k];
-    traits[k] = s===null ? (fv.length?mean(fv):null) : fv.length ? (1-w)*s + w*mean(fv) : s; });
-  const cond={}; COND_KEYS.forEach(k=>{ const s=st.cond[k]; const fv=fr.map(f=>f.cond[k]).filter(v=>typeof v==='number');
-    cond[k] = (s===undefined||s===null) ? (fv.length?mean(fv):null) : fv.length ? (1-w)*s + w*mean(fv) : s; });
-  return { self, rel, traits, selfTraits, cond, friends:fr, bearing: bearingOf(rel) };
+  // Friends' answers are shown beside yours for comparison; they don't change your scores or matches.
+  const rel = {...self};
+  const selfTraits = traitsFrom(st.ipip, IPIP), traits = {...selfTraits};
+  const cond={}; COND_KEYS.forEach(k=>{ const s=st.cond[k]; cond[k] = (s===undefined||s===null) ? null : s; });
+  let abs = null;
+  if(hasMip(st)){ const raw=selfRaw({...st, useHistory:false}); abs={}; ORDER.forEach(t=>abs[t]=raw[t]/20); }
+  return { self, rel, abs, traits, selfTraits, cond, friends:fr, bearing: bearingOf(rel) };
 }
 function bearingOf(rel){
   let x=0,y=0; ORDER.forEach(t=>{ const a=TYPES[t].deg*Math.PI/180; x+=rel[t]*Math.sin(a); y+=rel[t]*Math.cos(a); });
@@ -279,6 +284,7 @@ function bearingWords(P, D){
   return gap<=60 ? `· your needle ${where}.`
     : `· your two strongest types sit on different sides of the compass, so they partly cancel out and the needle ${where}.`;
 }
+const absWord = r => r>=0.75 ? 'Strong' : r>=0.5 ? 'Moderate' : r>=0.25 ? 'Some' : 'Low';
 const levelWord = r => r>=0.85 ? 'Strong' : r>=0.55 ? 'Moderate' : r>=0.3 ? 'Some' : 'Low';
 const leanLabel = s => s>=0.3 ? 'Clear lean' : s>=0.15 ? 'Moderate lean' : 'All-rounder';
 
@@ -391,7 +397,7 @@ const BACK_ICON = `<svg aria-hidden="true" width="20" height="20" viewBox="0 0 2
 const SHARE_ICON = `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>`;
 const ARROW = `<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>`;
 const LEGEND = [
-  ['01','Stories','What you’re drawn to'], ['02','Trade-offs','Fifteen quick choices'], ['03','How you run','Twenty statements'],
+  ['01','Stories','What you’re drawn to'], ['02','Activities','Thirty quick ratings'], ['03','How you run','Twenty statements'],
   ['04','Conditions','Your kind of day'], ['05','Experience','Asked last',true], ['06','Next steps','Study and progress',true]
 ];
 /* Where the person is up to, for the home screen list. Parts 1-5 only (the questionnaire). */
@@ -424,7 +430,7 @@ function incomingBanner(){
     ${APK_URL ? `<p style="margin-top:12px"><a href="${esc(APK_URL)}">Don’t have the app? Download it</a></p>` : ''}</section>`;
 }
 function intro(){
-  const inProgress = (S.phase==='intro') && (Object.keys(S.stories).length || Object.keys(S.pairs).length);
+  const inProgress = (S.phase==='intro') && (Object.keys(S.stories).length || Object.keys(S.pairs).length || Object.keys(S.mip||{}).length);
   const hasResults = S.done;
   const PS = (inProgress||hasResults) ? partStatus() : {};
   const mins = Math.floor(secsOf(quickScreens())/60); // rounded down: the last two parts are optional
@@ -498,6 +504,11 @@ function question(){
         <div class="pair-alt">${fr ? `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="skip" aria-pressed="${cur==='skip'}">Skip</button>`
           : `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="none" aria-pressed="${cur==='none'}">Neither appeals</button>`}</div></section>
         <div class="nav">${back}<button class="btn ghost" data-act="next" ${cur?'':'disabled'}>Next</button></div>`; break; }
+    case 'mip': {
+      const all = sc.items.every(i=>typeof S.mip[i.id]==='number');
+      body = `<section class="screen"><div class="q">How much would you enjoy doing each of these?</div><div>
+        ${sc.items.map(i=>`<div class="scale-item"><div>${esc(i.t)}</div><div class="scale words" role="group" aria-label="${esc(i.t)}">${MIP_SCALE.map((l,v)=>`<button data-act="mrate" data-id="${i.id}" data-v="${v}" aria-pressed="${S.mip[i.id]===v}">${l}</button>`).join('')}</div></div>`).join('')}</div></section>
+        <div class="nav">${back}<button class="btn" data-act="next" ${all?'':'disabled'}>Next</button></div>`; break; }
     case 'ipip': case 'fipip': {
       const store = sc.type==='fipip'? F.ipip : S.ipip; const all = sc.items.every(i=>store[i.id]!==undefined);
       body = `<section class="screen"><div class="q">${sc.type==='fipip' ? `How well does each describe <span class="friendq">${esc(nm())}</span>?` : 'How much does each sound like you?'}</div><div>
@@ -685,6 +696,11 @@ function fieldBoard(scored){
     <div class="chips">${byField[f].map(o=>`<button class="jobchip" data-act="open" data-v="${esc(o.j.t)}" aria-expanded="${S.open===o.j.t}"><span><span class="tb" style="background:var(--t${o.tier})">${TIER_NAME[o.tier].split(' ')[0]}</span>${esc(o.j.t)}</span><small>$${o.j.pay[0]}–${o.j.pay[1]}k</small></button>${S.open===o.j.t?jobDetail(o):''}`).join('')}</div>
     </div>`).join('')}</div>`;
 }
+function storyEcho(){
+  const said = STORIES.map(s=>{ const t=S.stories[s.id]; return t && t!=='none' ? s.opts[t] : null; }).filter(Boolean);
+  if(!said.length) return '';
+  return `<section class="section"><h2>What you said you’re drawn to</h2><p class="muted" style="margin:4px 0 12px">From the story questions. They don’t change your matches, so hold them up against the jobs below and see what fits.</p><ul class="look">${said.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>`;
+}
 function traitRows(P){
   const f = P.friends.length ? P.friends : [];
   return TRAIT_ORDER.map(k=>{ const z=P.selfTraits[k]; if(z===null) return '';
@@ -723,10 +739,13 @@ function results(){
   const P = profile(S), D = directionOf(P), scored = scoreJobs(P, S); LAST = scored;
   const name = S.name ? esc(S.name)+'’s' : 'Your';
   const friendsHtml = P.friends.length ? `<section class="section"><h2>How others see you</h2>
-    <p class="muted" style="margin:0">The dashed orange outline on the compass and the hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view counts for a quarter of your results.</p>
+    <p class="muted" style="margin:0">The dashed orange outline on the compass and the hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view is there to compare with yours. It doesn’t change your matches.</p>
     ${P.friends.filter(f=>f.text).map(f=>`<div class="panel"><div class="eyebrow">${esc(f.name)} says you’re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}
     ${P.friends.filter(f=>f.rel).map(f=>{ const fb=bearingOf(f.rel); const diff=Math.abs(((fb.deg-P.bearing.deg+540)%360)-180); return `<p style="margin:0">${esc(f.name)}’s bearing for you: <b style="font-family:var(--mono)">${String(fb.deg).padStart(3,'0')}°</b>. ${diff<=30?'That’s close to how you see yourself.':diff<=75?'That’s a noticeably different angle from yours, worth talking about.':'That’s a very different read from yours. Ask them what they’ve seen.'}</p>`; }).join('')}</section>` : '';
   const sCount = scored.filter(o=>o.tier==='S').length;
+  const upgrade = !hasMip(S) ? `<section class="section"><div class="panel offer"><span class="eyebrow">Updated questions</span><h3>Get sharper matches in about 3 minutes</h3>
+    <p style="margin:0">Bearing now uses 30 activity ratings from the O*NET Interest Profiler instead of the trade-off questions. Your other answers are kept.</p>
+    <div class="cta-row"><button class="btn" data-act="mip-update">Rate the activities</button></div></div></section>` : '';
   return `<main class="wide">
   <section class="res-head">
     <div>${compassSVG(P)}</div>
@@ -736,13 +755,15 @@ function results(){
       <span class="lean">${leanLabel(P.bearing.strength)} · ${TYPES[D.top[0]].name} + ${TYPES[D.top[1]].name}</span>
       <p>${D.d}</p>
       ${P.bearing.strength<0.15 && D.key!=='ALL' ? `<p class="muted">Your answers spread fairly evenly across all six directions. That usually means you’d be happy in more kinds of work than most people, and that the conditions below matter more than the field.</p>` : ''}
-      <div class="mix">${D.top.map((t,i)=>`<div class="mixrow ${i<2?'top':''}"><span>${TYPES[t].name}</span><div class="bar"><i style="width:${Math.max(4,100*P.rel[t]/P.rel[D.top[0]]).toFixed(0)}%"></i></div><span>${levelWord(P.rel[t]/P.rel[D.top[0]])}</span></div>`).join('')}</div>
+      <div class="mix">${D.top.map((t,i)=>`<div class="mixrow ${i<2?'top':''}"><span>${TYPES[t].name}</span><div class="bar"><i style="width:${Math.max(4,100*(P.abs ? P.abs[t] : P.rel[t]/P.rel[D.top[0]])).toFixed(0)}%"></i></div><span>${P.abs ? absWord(P.abs[t]) : levelWord(P.rel[t]/P.rel[D.top[0]])}</span></div>`).join('')}</div>
     </div>
   </section>
+  ${upgrade}
   <section class="section grid2">
     <div><h2>Look for</h2><p class="muted" style="margin:4px 0 12px">Whatever job you pick, these were your strongest calls on how the day should run.</p><ul class="look">${lookFor(P)}</ul></div>
     <div><h2>How you run</h2><div style="margin-top:6px">${traitRows(P)}</div></div>
   </section>
+  ${storyEcho()}
   ${!SET.ai && !SET.aiOfferSeen ? `<section class="section"><div class="panel offer"><span class="eyebrow">Optional</span><h3 style="font-size:26px;text-transform:uppercase">Want to go deeper?</h3>
     <p style="margin:0">Turn on the AI coach and add a few lines in your own words (about 3 minutes). You\u2019ll get a prompt that gives any AI chat the full picture, so it can talk through your direction, the tensions in your answers, and a plan to get there.</p>
     <p class="muted" style="margin:0;font-size:14px">Nothing is sent from this app. You choose where to paste it. Your matches stay the same either way.</p>
@@ -753,7 +774,7 @@ function results(){
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
     <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${S.useHistory?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
     <div class="optstrip" role="group" aria-label="Optional next steps"><span class="eyebrow">Optional</span>
-      ${!S.refineDone ? `<button class="chipbtn sm" data-act="jump" data-v="opt-refine">Refine it</button>` : ''}
+      ${!S.refineDone ? `<button class="chipbtn sm" data-act="jump" data-v="opt-refine">Your own words</button>` : ''}
       <button class="chipbtn sm" data-act="jump" data-v="opt-friend">Ask a friend</button>
       <button class="chipbtn sm" data-act="jump" data-v="ai-panel">AI coach</button>
       <button class="chipbtn sm" data-act="jump" data-v="opt-share">Keep or share</button></div>
@@ -762,7 +783,7 @@ function results(){
     <div id="board">${board()}</div>
   </section>
   <section class="section"><h2>Optional next steps</h2><div class="actions">
-    ${!S.refineDone ? `<div class="panel" id="opt-refine"><h3>Refine it</h3><p>About ${minsOf(refineScreens())} more minutes: fifteen more trade-offs and three questions in your own words. It sharpens the direction.</p><button class="btn" data-act="refine">Start refining round</button></div>` : ''}
+    ${!S.refineDone ? `<div class="panel" id="opt-refine"><h3>In your own words</h3><p>About ${minsOf(refineScreens())} more minutes: three questions in your own words and one about what wears you out. It doesn’t change your matches, but it gives you and the AI coach more to work with.</p><button class="btn" data-act="refine">Start</button></div>` : ''}
     <div class="panel" id="opt-friend"><h3>Ask a friend</h3>${LINKS
       ? `<p>Send an invite to someone who knows you well. They answer about ${minsOf(friendScreens())} minutes of questions about you, then send their answers back to you.</p>
          <label class="eyebrow" for="reply-in">Your email, so their answers come straight back to you (optional)</label>
@@ -779,7 +800,7 @@ function results(){
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> Your answers map to Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0, U.S. Department of Labor), matched by hand to Australian jobs. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story and trade-off questions were written for Bearing and haven\u2019t been validated as a test. Scoring is fixed rules, with no AI.</p>
+    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story questions are for reflection and don\u2019t change your matches. Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;
@@ -809,6 +830,8 @@ When I reply, update the recommendation and say what changed.
 
 MY RESULTS`);
   L.push(`Direction: ${D.n}${D.key==='ALL'?'':` (bearing ${P.bearing.deg} degrees, ${leanLabel(P.bearing.strength).toLowerCase()})`}. Interest mix (Holland RIASEC): ${D.top.map(t=>`${TYPES[t].name} ${Math.round(P.rel[t]*100)}%`).join(', ')}.`);
+  if(hasMip(S)){ const pick=v=>MINI_IP.filter(i=>S.mip[i.id]===v).map(i=>i.t.toLowerCase()); const sl=pick(4), sd=pick(0);
+    if(sl.length) L.push('Activities I would strongly like: '+sl.join('; ')+'.'); if(sd.length) L.push('Activities I would strongly dislike: '+sd.join('; ')+'.'); }
   L.push('Personality (Mini-IPIP Big Five): '+TRAIT_ORDER.filter(k=>P.selfTraits[k]!==null).map(k=>`${TRAITS[k].name} ${P.selfTraits[k]>0.25?'high':P.selfTraits[k]<-0.25?'low':'middle'}`).join('; ')+'.');
   const cs = COND.filter(c=>P.cond[c.k]!==null&&Math.abs(P.cond[c.k])>=1).map(c=>(Math.abs(P.cond[c.k])>=2?'strongly: ':'')+(P.cond[c.k]>0?c.hi:c.lo));
   L.push('Working conditions I want: '+(cs.join('; ')||'no strong preferences')+'.');
@@ -843,7 +866,9 @@ function grabText(){
   if(F){ const a=document.getElementById('ffor'), b=document.getElementById('fby'), c=document.getElementById('ftx');
     if(a) F.for=a.value.trim().slice(0,40); if(b) F.by=b.value.trim().slice(0,40); if(c) F.text=c.value.slice(0,600); }
 }
-function next(){ grabText(); const list=screens(); if(S.idx<list.length-1) S.idx++; if(S.phase==='quick') S.reach=Math.max(S.reach||0,S.idx); save(); render(); }
+function next(){ grabText(); const list=screens(); if(S.idx<list.length-1) S.idx++; if(S.phase==='quick') S.reach=Math.max(S.reach||0,S.idx);
+  if(S.updatingMip && S.phase==='quick' && list[S.idx].part!==2){ S.updatingMip=false; S.phase='results'; window.scrollTo(0,0); }
+  save(); render(); }
 function profileCode(){ const {phase,idx,open,view,showD,showC,pendingFriends,pendingProfile,_confirmDelete,backPhase,resumePhase,prevPhase,fb,replyEmail,...rest}=S; return encode('BRG-P1.', rest); }
 
 function grabFb(){ S.fb=S.fb||{}; const c=document.getElementById('fb-comment'); if(c) S.fb.comment=c.value.slice(0,500); const i=document.getElementById('fb-include'); if(i) S.fb.include=i.checked; }
@@ -858,6 +883,7 @@ async function onClick(e){
     case 'show-results': S.phase='results'; save(); render(); break;
     case 'home': grabText(); if(S.phase==='words'){ S.phase='results'; save(); render(); break; } if(S.phase==='friend'){ S.phase = S.done?'results':'intro'; } else if(S.phase!=='results'){ S.resumePhase=S.phase; S.phase='intro'; } else S.phase='intro'; save(); render(); break;
     case 'next': next(); break;
+    case 'mip-update': { S.updatingMip=true; S.phase='quick'; S.idx=quickScreens().findIndex(x=>x.part===2); save(); render(); break; }
     case 'jump': { const el=document.getElementById(v); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); break; }
     case 'back': grabText(); S.idx=Math.max(0,S.idx-1); save(); render(); break;
     case 'story-none': { grabText(); S.stories[id]='none'; if(S.stories2) delete S.stories2[id]; save(); render(); setTimeout(next, 220); break; }
@@ -868,6 +894,7 @@ async function onClick(e){
       else { S.stories2[id]=v; }
       save(); render(); break; }
     case 'pick': { const sc=screens()[S.idx]; const store = sc.type==='fpair'? F.pairs : sc.set==='refine'? S.refine.pairs : S.pairs; store[id]=v; save(); render(); setTimeout(next, 220); break; }
+    case 'mrate': { S.mip[id]=+v; save(); render(); break; }
     case 'rate': { const sc=screens()[S.idx]; (sc.type==='fipip'?F.ipip:S.ipip)[id]=+v; save(); render(); break; }
     case 'cond': { const sc=screens()[S.idx]; (sc.type==='fcond'?F.cond:S.cond)[id]= v==='skip' ? 'skip' : +v; save(); render(); break; }
     case 'role-add': grabText(); S.roles.push({t:'',types:[],good:null,enjoy:null}); save(); render();

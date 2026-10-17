@@ -361,3 +361,6 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 /* Results heading: the title leads, the compass number sits underneath with a plain explanation */
 .bearing-line{margin:6px 0 10px;font-size:16px;color:var(--brg-ink-2);line-height:1.45}
 .bearing-line b{font-family:var(--brg-font-mono);color:var(--brg-accent);font-weight:600;font-size:18px}
+
+/* Mini-IP: five labelled answers per activity */
+.scale.words button{font-family:var(--brg-font-body);font-size:13px;line-height:1.15;padding:8px 2px;min-height:48px}
