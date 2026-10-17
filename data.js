@@ -160,6 +160,17 @@ const COND = [
   { k:'rsk', lo:'Secure, steady pay', hi:'Riskier, bigger upside' }
 ];
 const COND_KEYS = COND.map(c => c.k);
+
+/* Part 4: work values from the Theory of Work Adjustment (Dawis & Lofquist), as O*NET defines them.
+   You rank them; each job's scores come from the O*NET 30.2 work values in onet.js (same order). */
+const WORK_VALUES = [
+  { k:'ach', n:'Achievement', d:'Using your best abilities and seeing the results of your work.' },
+  { k:'ind', n:'Independence', d:'Working on your own and making your own decisions.' },
+  { k:'rec', n:'Recognition', d:'Room to advance, take the lead and be respected for what you do.' },
+  { k:'rel', n:'Relationships', d:'Friendly workmates, and a chance to help other people.' },
+  { k:'sup', n:'Support', d:'An employer and managers who back you and treat you fairly.' },
+  { k:'wc',  n:'Working conditions', d:'Good pay, job security, some variety and a comfortable setup.' }
+];
 const FRIEND_COND = ['ppl','out','aut','stk'];
 
 /* Refining round */

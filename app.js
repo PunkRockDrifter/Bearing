@@ -36,7 +36,7 @@ function decode(code){
 }
 
 /* ---------- state ---------- */
-function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, pairs:{}, mip:{}, ipip:{}, cond:{},
+function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, pairs:{}, mip:{}, ipip:{}, values:[], cond:{},
   exp:{ skills:[], q:null }, expSkipped:false, refine:{ pairs:{}, deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, minPay:0 }; }
 function freshF(){ return { for:'', by:'', pairs:{}, ipip:{}, cond:{}, text:'' }; }
 let S = fresh(), F = null;
@@ -88,7 +88,7 @@ function buildFeedback(){
       interests:Object.fromEntries(ORDER.map(t=>[t,r2(P.rel[t])])),
       traits:Object.fromEntries(TRAIT_ORDER.map(k=>[k,r2(P.selfTraits[k])])),
       conditions:Object.fromEntries(COND_KEYS.map(k=>[k,S.cond[k]??null])),
-      stories:S.stories, stories_also:S.stories2||{}, pairs:S.pairs, activities:S.mip||{}, ratings:S.ipip,
+      stories:S.stories, stories_also:S.stories2||{}, pairs:S.pairs, activities:S.mip||{}, values:S.values||[], ratings:S.ipip,
       refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
@@ -118,7 +118,7 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify({S,F})); }catch(e
 function load(){ try{ const raw = localStorage.getItem(KEY); if(raw){ const o=JSON.parse(raw); if(o && o.S){ S=Object.assign(fresh(),o.S); F=o.F||null; } } }catch(e){} }
 
 /* ---------- screen lists ---------- */
-const SECS = {interlude:5, story:28, pair:10, mip:25, ipip:30, cond:25, exp:45, roles:60, deep:60, drain:15, fname:20, fpair:10, fipip:30, fcond:30, ftext:30, fdone:0};
+const SECS = {interlude:5, story:28, pair:10, mip:25, values:40, ipip:30, cond:25, exp:45, roles:60, deep:60, drain:15, fname:20, fpair:10, fipip:30, fcond:30, ftext:30, fdone:0};
 const secsOf = list => list.reduce((a,x)=>a+(SECS[x.type]??10),0);
 const minsOf = list => Math.max(1, Math.round(secsOf(list)/60));
 function chunk(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
@@ -129,7 +129,8 @@ function quickScreens(){
   chunk(MINI_IP,5).forEach(items=>s.push({type:'mip', items, part:2}));
   s.push({type:'interlude', part:3, title:'How you run', text:'Twenty short statements. Rate how much each sounds like you most of the time, not how you’d like to be.'});
   chunk(IPIP,5).forEach(items=>s.push({type:'ipip', items, part:3}));
-  s.push({type:'interlude', part:4, title:'Conditions', text:'Where you’d sit between two ways a working day can go. The middle is fine if you genuinely don’t mind.'});
+  s.push({type:'interlude', part:4, title:'What you need', text:'First, rank what you need work to give you. Then, where you’d sit between two ways a working day can go. The middle is fine if you genuinely don’t mind.'});
+  s.push({type:'values', part:4});
   chunk(COND,3).forEach(items=>s.push({type:'cond', items, part:4}));
   s.push({type:'exp', part:5});
   s.push({type:'roles', part:5});
@@ -150,7 +151,7 @@ function friendScreens(){
   return s;
 }
 function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): []; }
-const PART_NAMES = { quick:['Stories','Activities','How you run','Conditions','Experience'], refine:['In your words','What drains you'] };
+const PART_NAMES = { quick:['Stories','Activities','How you run','What you need','Experience'], refine:['In your words','What drains you'] };
 
 /* ---------- scoring ---------- */
 function relFrom(raw){
@@ -159,6 +160,15 @@ function relFrom(raw){
   const o={}; ORDER.forEach((t,i)=>o[t]= sum>0 ? shifted[i]/sum : 1/6); return o;
 }
 const hasMip = st => !!(st.mip && Object.keys(st.mip).length);
+const hasValues = st => !!(st.values && st.values.length===WORK_VALUES.length);
+/* Needs-supplies fit (Theory of Work Adjustment): your ranking (6 for first down to 1 for last)
+   correlated with how strongly the job offers each value in O*NET. Null if either side is missing. */
+function valuesFit(j, st){
+  if(!hasValues(st) || !j.values) return null;
+  const want = WORK_VALUES.map(v=>WORK_VALUES.length-st.values.indexOf(v.k));
+  const a={}, b={}; ORDER.forEach((t,i)=>{ a[t]=want[i]; b[t]=j.values[i]; });
+  return (pearson(a,b)+1)/2;
+}
 function selfRaw(st){
   const raw={R:0,I:0,A:0,S:0,E:0,C:0};
   if(hasMip(st)){
@@ -225,8 +235,11 @@ function scoreJobs(P, st){
     const cf = cw ? 1 - cd/(4*cw) : 0.5;
     const tk = Object.keys(j.tr||{}); let tf=0.5;
     if(tk.length){ let num=0, den=0; tk.forEach(k=>{ const z=P.traits[k]; if(z!==null){ num+=z*j.tr[k]; den+=Math.abs(j.tr[k]); } }); if(den) tf=0.5+0.5*num/den; }
-    const total = 0.6*r + 0.28*cf + 0.12*tf;
-    return { j, r, cf, tf, total };
+    const vf = valuesFit(j, st);
+    // Provisional weights (not calibrated against outcomes): interests 50, values 20, conditions 20, personality 10.
+    const parts = [[0.5,r],[0.2,vf],[0.2,cf],[0.1,tf]].filter(([,v])=>v!==null);
+    const total = parts.reduce((s,[w,v])=>s+w*v,0) / parts.reduce((s,[w])=>s+w,0);
+    return { j, r, cf, tf, vf, total };
   });
   const tot = out.map(o=>o.total); const m=mean(tot); const sd=Math.sqrt(mean(tot.map(v=>(v-m)**2)))||1;
   out.sort((a,b)=>b.total-a.total);
@@ -250,8 +263,14 @@ function reasons(o, P, topTypes){
   Object.entries(j.tr||{}).forEach(([k,v])=>{ const z=P.traits[k]; if(z===null||v<0.5) return;
     if(z>=0.3) why.push(`Your ${TRAITS[k].name.toLowerCase()} suits it.`);
     else if(z<=-0.3) watch.push(`It asks a lot of ${TRAITS[k].name.toLowerCase()}, which came out lower for you.`); });
+  if(o.vf!==null && o.vf!==undefined && j.values){
+    const top=S.values[0], wv=WORK_VALUES.find(v=>v.k===top), jv=j.values[WORK_VALUES.indexOf(wv)];
+    if(jv>=5.5) why.push(`Strong on what you need most: ${wv.n.toLowerCase()}.`);
+    else if(jv<=3.5) watch.push(`Lower on what you need most: ${wv.n.toLowerCase()}.`);
+  }
   const not=[];
   if(o.tier!=='S'){
+    if(o.vf!==null && o.vf!==undefined && o.vf<0.45) not.push('What it offers doesn’t line up well with what you ranked as most important.');
     if(o.r<0.72){ const jt=j.code.slice(0,2).split('').map(t=>TYPES[t].name).join(' and '); const pt=topTypes.slice(0,2).map(t=>TYPES[t].name).join(' and ');
       not.push(o.r<0.5 ? `Your interests point a different way. This is mostly ${jt} work, and your strongest pulls are ${pt}.` : `Only a partial interest match. This is mostly ${jt} work, while your strongest pulls are ${pt}.`); }
     if(o.cf<0.72 && !watch.some(w=>w.startsWith('This job leans'))) not.push('Several of its working conditions sit away from what you picked, though none sharply.');
@@ -398,7 +417,7 @@ const SHARE_ICON = `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 
 const ARROW = `<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>`;
 const LEGEND = [
   ['01','Stories','What you’re drawn to'], ['02','Activities','Thirty quick ratings'], ['03','How you run','Twenty statements'],
-  ['04','Conditions','Your kind of day'], ['05','Experience','Asked last',true], ['06','Next steps','Study and progress',true]
+  ['04','What you need','What work gives you, and your kind of day'], ['05','Experience','Asked last',true], ['06','Next steps','Study and progress',true]
 ];
 /* Where the person is up to, for the home screen list. Parts 1-5 only (the questionnaire). */
 function partStatus(){
@@ -504,6 +523,12 @@ function question(){
         <div class="pair-alt">${fr ? `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="skip" aria-pressed="${cur==='skip'}">Skip</button>`
           : `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="none" aria-pressed="${cur==='none'}">Neither appeals</button>`}</div></section>
         <div class="nav">${back}<button class="btn ghost" data-act="next" ${cur?'':'disabled'}>Next</button></div>`; break; }
+    case 'values': {
+      const r=S.values||[], done=r.length===WORK_VALUES.length;
+      body = `<section class="screen"><div class="q">What do you most need work to give you?</div><p class="hint">Tap them in order, most important first. Tap one again to take it out.</p><div class="opts">${shuffle(WORK_VALUES,'values').map(v=>{ const i=r.indexOf(v.k);
+          return `<button class="opt rank" data-act="vrank" data-v="${v.k}" aria-pressed="${i>=0}">${i>=0?`<span class="rankno" aria-label="Rank ${i+1}">${i+1}</span>`:''}<b>${esc(v.n)}</b><span class="vdesc">${esc(v.d)}</span></button>`; }).join('')}</div>
+        ${r.length ? `<div class="pair-alt"><button class="chipbtn" data-act="vreset">Start the order again</button></div>` : ''}</section>
+        <div class="nav">${back}<button class="btn" data-act="next" ${done?'':'disabled'}>Next</button></div>`; break; }
     case 'mip': {
       const all = sc.items.every(i=>typeof S.mip[i.id]==='number');
       body = `<section class="screen"><div class="q">How much would you enjoy doing each of these?</div><div>
@@ -666,7 +691,7 @@ function jobDetail(o){
     <div class="meta"><span><b>${TIER_NAME[o.tier]}</b></span><span>Pay <b>$${j.pay[0]}k–$${j.pay[1]}k</b> a year, indicative</span><span>Usual entry <b>${QUALS[j.q]}</b></span></div>
     ${o.ready ? `<div><span class="ready r${o.ready.lvl}">${READY[o.ready.lvl]}</span>${o.ready.carry.length?` <span class="muted" style="font-size:14px">Carries over: ${o.ready.carry.map(esc).join(', ')}</span>`:''}</div>` : ''}
     ${o.why.why.length ? `<div><div class="lbl">Why it fits</div><ul>${o.why.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-    <div><div class="lbl">Match breakdown</div><div class="meters">${[['Interests',o.r],['Conditions',o.cf],['Personality',o.tf]].map(([l,v])=>`<div class="meter"><span>${l}</span><div class="bar"><i style="width:${Math.round(Math.max(0.04,Math.min(1,v))*100)}%"></i></div><b>${v>=0.75?'Strong':v>=0.55?'Fair':'Weak'}</b></div>`).join('')}</div></div>
+    <div><div class="lbl">Match breakdown</div><div class="meters">${[['Interests',o.r],...(o.vf!==null&&o.vf!==undefined?[['Values',o.vf]]:[]),['Conditions',o.cf],['Personality',o.tf]].map(([l,v])=>`<div class="meter"><span>${l}</span><div class="bar"><i style="width:${Math.round(Math.max(0.04,Math.min(1,v))*100)}%"></i></div><b>${v>=0.75?'Strong':v>=0.55?'Fair':'Weak'}</b></div>`).join('')}</div></div>
     ${(o.why.not.length||o.why.watch.length) ? `<div><div class="lbl">${o.tier==='S'?'Watch for':'Why it\u2019s not higher'}</div><ul>${o.why.not.concat(o.why.watch).map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div><div class="lbl">A day in the life</div><p>${esc(j.day)}</p></div>
     <div><div class="lbl">How people get in</div><p>${esc(j.path)}</p></div>
@@ -710,7 +735,8 @@ function traitRows(P){
       <div class="ends"><span>${TRAITS[k].lo}</span><span>${TRAITS[k].hi}</span></div></div>`; }).join('');
 }
 function lookFor(P){
-  return COND.map(c=>({c, v:P.cond[c.k]})).filter(x=>x.v!==null && Math.abs(x.v)>=1).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,4)
+  const need = hasValues(S) ? `<li>What you need most: ${S.values.slice(0,2).map(k=>WORK_VALUES.find(v=>v.k===k).n.toLowerCase()).join(', then ')}.</li>` : '';
+  return need + COND.map(c=>({c, v:P.cond[c.k]})).filter(x=>x.v!==null && Math.abs(x.v)>=1).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,4)
     .map(x=>`<li>${x.v>0?x.c.hi:x.c.lo}</li>`).join('') || '<li>You were flexible on working conditions, so they didn’t narrow things much.</li>';
 }
 let LAST = [];
@@ -743,7 +769,9 @@ function results(){
     ${P.friends.filter(f=>f.text).map(f=>`<div class="panel"><div class="eyebrow">${esc(f.name)} says you’re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}
     ${P.friends.filter(f=>f.rel).map(f=>{ const fb=bearingOf(f.rel); const diff=Math.abs(((fb.deg-P.bearing.deg+540)%360)-180); return `<p style="margin:0">${esc(f.name)}’s bearing for you: <b style="font-family:var(--mono)">${String(fb.deg).padStart(3,'0')}°</b>. ${diff<=30?'That’s close to how you see yourself.':diff<=75?'That’s a noticeably different angle from yours, worth talking about.':'That’s a very different read from yours. Ask them what they’ve seen.'}</p>`; }).join('')}</section>` : '';
   const sCount = scored.filter(o=>o.tier==='S').length;
-  const upgrade = !hasMip(S) ? `<section class="section"><div class="panel offer"><span class="eyebrow">Updated questions</span><h3>Get sharper matches in about 3 minutes</h3>
+  const upgrade = hasMip(S) && !hasValues(S) ? `<section class="section"><div class="panel offer"><span class="eyebrow">New question</span><h3>Rank what you need from work</h3>
+    <p style="margin:0">One quick question, about a minute. Your matches will then also weigh what each job offers against what matters most to you.</p>
+    <div class="cta-row"><button class="btn" data-act="values-update">Rank them</button></div></div></section>` : !hasMip(S) ? `<section class="section"><div class="panel offer"><span class="eyebrow">Updated questions</span><h3>Get sharper matches in about 3 minutes</h3>
     <p style="margin:0">Bearing now uses 30 activity ratings from the O*NET Interest Profiler instead of the trade-off questions. Your other answers are kept.</p>
     <div class="cta-row"><button class="btn" data-act="mip-update">Rate the activities</button></div></div></section>` : '';
   return `<main class="wide">
@@ -800,7 +828,7 @@ function results(){
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story questions are for reflection and don\u2019t change your matches. Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
+    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story questions are for reflection and don\u2019t change your matches. Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;
@@ -832,6 +860,7 @@ MY RESULTS`);
   L.push(`Direction: ${D.n}${D.key==='ALL'?'':` (bearing ${P.bearing.deg} degrees, ${leanLabel(P.bearing.strength).toLowerCase()})`}. Interest mix (Holland RIASEC): ${D.top.map(t=>`${TYPES[t].name} ${Math.round(P.rel[t]*100)}%`).join(', ')}.`);
   if(hasMip(S)){ const pick=v=>MINI_IP.filter(i=>S.mip[i.id]===v).map(i=>i.t.toLowerCase()); const sl=pick(4), sd=pick(0);
     if(sl.length) L.push('Activities I would strongly like: '+sl.join('; ')+'.'); if(sd.length) L.push('Activities I would strongly dislike: '+sd.join('; ')+'.'); }
+  if(hasValues(S)) L.push('What I need most from work, in order (Theory of Work Adjustment values): '+S.values.map(k=>WORK_VALUES.find(v=>v.k===k).n).join(', ')+'.');
   L.push('Personality (Mini-IPIP Big Five): '+TRAIT_ORDER.filter(k=>P.selfTraits[k]!==null).map(k=>`${TRAITS[k].name} ${P.selfTraits[k]>0.25?'high':P.selfTraits[k]<-0.25?'low':'middle'}`).join('; ')+'.');
   const cs = COND.filter(c=>P.cond[c.k]!==null&&Math.abs(P.cond[c.k])>=1).map(c=>(Math.abs(P.cond[c.k])>=2?'strongly: ':'')+(P.cond[c.k]>0?c.hi:c.lo));
   L.push('Working conditions I want: '+(cs.join('; ')||'no strong preferences')+'.');
@@ -868,6 +897,7 @@ function grabText(){
 }
 function next(){ grabText(); const list=screens(); if(S.idx<list.length-1) S.idx++; if(S.phase==='quick') S.reach=Math.max(S.reach||0,S.idx);
   if(S.updatingMip && S.phase==='quick' && list[S.idx].part!==2){ S.updatingMip=false; S.phase='results'; window.scrollTo(0,0); }
+  if(S.updatingValues && S.phase==='quick' && list[S.idx].type!=='values'){ S.updatingValues=false; S.phase='results'; window.scrollTo(0,0); }
   save(); render(); }
 function profileCode(){ const {phase,idx,open,view,showD,showC,pendingFriends,pendingProfile,_confirmDelete,backPhase,resumePhase,prevPhase,fb,replyEmail,...rest}=S; return encode('BRG-P1.', rest); }
 
@@ -883,6 +913,7 @@ async function onClick(e){
     case 'show-results': S.phase='results'; save(); render(); break;
     case 'home': grabText(); if(S.phase==='words'){ S.phase='results'; save(); render(); break; } if(S.phase==='friend'){ S.phase = S.done?'results':'intro'; } else if(S.phase!=='results'){ S.resumePhase=S.phase; S.phase='intro'; } else S.phase='intro'; save(); render(); break;
     case 'next': next(); break;
+    case 'values-update': { S.updatingValues=true; S.phase='quick'; S.idx=quickScreens().findIndex(x=>x.type==='values'); save(); render(); break; }
     case 'mip-update': { S.updatingMip=true; S.phase='quick'; S.idx=quickScreens().findIndex(x=>x.part===2); save(); render(); break; }
     case 'jump': { const el=document.getElementById(v); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); break; }
     case 'back': grabText(); S.idx=Math.max(0,S.idx-1); save(); render(); break;
@@ -895,6 +926,10 @@ async function onClick(e){
       save(); render(); break; }
     case 'pick': { const sc=screens()[S.idx]; const store = sc.type==='fpair'? F.pairs : sc.set==='refine'? S.refine.pairs : S.pairs; store[id]=v; save(); render(); setTimeout(next, 220); break; }
     case 'mrate': { S.mip[id]=+v; save(); render(); break; }
+    case 'vrank': { S.values=S.values||[]; const i=S.values.indexOf(v); if(i>=0) S.values.splice(i,1); else S.values.push(v);
+      if(i<0 && S.values.length===WORK_VALUES.length-1) S.values.push(WORK_VALUES.find(x=>!S.values.includes(x.k)).k); // the last one ranks itself
+      save(); render(); break; }
+    case 'vreset': { S.values=[]; save(); render(); break; }
     case 'rate': { const sc=screens()[S.idx]; (sc.type==='fipip'?F.ipip:S.ipip)[id]=+v; save(); render(); break; }
     case 'cond': { const sc=screens()[S.idx]; (sc.type==='fcond'?F.cond:S.cond)[id]= v==='skip' ? 'skip' : +v; save(); render(); break; }
     case 'role-add': grabText(); S.roles.push({t:'',types:[],good:null,enjoy:null}); save(); render();
