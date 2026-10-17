@@ -215,7 +215,7 @@ function congruence(top, code){ let n=0,d=0; code.split('').forEach((t,i)=>{ con
 function scoreJobs(P, st){
   const topTypes = ORDER.slice().sort((a,b)=>P.rel[b]-P.rel[a]);
   const out = JOBS.map(j=>{
-    const r = 0.6*((pearson(P.rel, jobVec(j.code))+1)/2) + 0.4*congruence(topTypes, j.code);
+    const r = 0.6*((pearson(P.rel, j.ri || jobVec(j.code))+1)/2) + 0.4*congruence(topTypes, j.code);
     let cw=0, cd=0; COND_KEYS.forEach((k,i)=>{ const c=P.cond[k]; if(c===null||c===undefined) return; const w=0.5+Math.abs(c)/2; cw+=w; cd+=w*Math.abs(c-j.c[i]); });
     const cf = cw ? 1 - cd/(4*cw) : 0.5;
     const tk = Object.keys(j.tr||{}); let tf=0.5;
@@ -779,7 +779,7 @@ function results(){
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> The story questions are adapted from the themes of Mark Savickas’s Career Construction Interview. Answers map to Holland’s six interest types (RIASEC), the model behind the US Department of Labor’s O*NET Interest Profiler, and the job codes come from O*NET equivalents. “How you run” uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. Scoring is fixed rules, with no AI.</p>
+    <p><b>How this works.</b> Your answers map to Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0, U.S. Department of Labor), matched by hand to Australian jobs. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story and trade-off questions were written for Bearing and haven\u2019t been validated as a test. Scoring is fixed rules, with no AI.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;

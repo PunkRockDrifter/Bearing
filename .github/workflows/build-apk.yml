@@ -29,7 +29,7 @@ jobs:
         run: |
           W=android/app/src/main/assets/www
           mkdir -p "$W"
-          cp index.html style.css config.js data.js jobs2.js app.js manifest.webmanifest privacy.html "$W"/
+          cp index.html style.css config.js data.js jobs2.js onet.js app.js manifest.webmanifest privacy.html "$W"/
           cp -r icons fonts "$W"/
           # Mark this copy as running inside the Android app
           sed -i 's#<script>window.BEARING_HOSTED = true;</script>#<script>window.BEARING_HOSTED = true; window.BEARING_ANDROID = true;</script>#' "$W/index.html"

@@ -1,6 +1,6 @@
 /* Bearing service worker: works offline after the first visit. */
-const CACHE = 'bearing-2026-10-17b';
-const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'data.js', 'jobs2.js', 'app.js', 'manifest.webmanifest',
+const CACHE = 'bearing-2026-10-17c';
+const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'data.js', 'jobs2.js', 'onet.js', 'app.js', 'manifest.webmanifest',
   'privacy.html', 'fonts/fonts.css', 'fonts/instrument-serif-latin-400-normal.woff2', 'fonts/instrument-serif-latin-400-italic.woff2',
   'fonts/public-sans-latin-400-normal.woff2', 'fonts/public-sans-latin-500-normal.woff2', 'fonts/public-sans-latin-600-normal.woff2',
   'fonts/ibm-plex-mono-latin-400-normal.woff2', 'fonts/ibm-plex-mono-latin-500-normal.woff2', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
