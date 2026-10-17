@@ -372,3 +372,6 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .opt.rank .rankno{grid-row:1/span 2;grid-column:1;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--brg-accent);color:var(--brg-on-accent);font:600 15px var(--brg-font-mono)}
 .opt.rank{min-height:auto;font-size:16px}
 .opt.rank:not([aria-pressed="true"]){padding-left:calc(14px + 28px)}
+
+/* A job that clashes with a strongest answer */
+.clash{margin:0;font-size:14px;color:var(--brg-accent)}

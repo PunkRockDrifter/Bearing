@@ -37,43 +37,6 @@ const STORIES = [
            S:'Catching up with friends, or helping a mate move house.', E:'Planning something bigger, or working on a side project.', C:'Sorting out the house, the budget or next week’s plan.' } }
 ];
 
-/* Part 2: forced choices. Every type meets every other type once. */
-const PAIRS = [
-  { id:'p1',  a:['R','Rebuild an old motorbike engine until it runs.'], b:['I','Work out why one town floods every summer and the next town doesn’t.'] },
-  { id:'p2',  a:['R','Build a timber boat from a set of plans.'], b:['A','Design the poster and the whole look of a local music festival.'] },
-  { id:'p3',  a:['R','Plant a thousand native trees on a burnt-out hillside.'], b:['S','Teach an adult to read over a few months.'] },
-  { id:'p4',  a:['R','Rig the stage and lights for an outdoor concert.'], b:['E','Talk the council into approving that concert.'] },
-  { id:'p5',  a:['R','Fix the fences on a cattle station.'], b:['C','Set up the station’s stock and paddock records so nothing gets lost.'] },
-  { id:'p6',  a:['I','Trace the source of a food poisoning outbreak.'], b:['A','Write a short story that wins a local prize.'] },
-  { id:'p7',  a:['I','Figure out why the bees vanished from one valley.'], b:['S','Coach an under-12s team through a losing season.'] },
-  { id:'p8',  a:['I','Test which of three ideas actually works.'], b:['E','Pitch the winning idea to a room of investors.'] },
-  { id:'p9',  a:['I','Decode a 100-year-old handwritten ship’s logbook.'], b:['C','Catalogue a museum archive so anyone can find anything.'] },
-  { id:'p10', a:['A','Compose the music for a short film.'], b:['S','Help a family through a really hard week.'] },
-  { id:'p11', a:['A','Invent a dish nobody has tasted before.'], b:['E','Turn a struggling café into the busiest one in town.'] },
-  { id:'p12', a:['A','Paint a mural on the side of a building.'], b:['C','Build the minute-by-minute schedule for a three-day festival.'] },
-  { id:'p13', a:['S','Settle a long-running fight between two neighbours.'], b:['E','Negotiate a better deal out of a stubborn supplier.'] },
-  { id:'p14', a:['S','Sit with a nervous patient before their surgery.'], b:['C','Design the checklist that stops surgical mistakes.'] },
-  { id:'p15', a:['E','Recruit and lead a crew for a big one-off job.'], b:['C','Keep the books for a small business so it never gets a nasty surprise.'] }
-];
-const PAIRS_REFINE = [
-  { id:'q1',  a:['R','Service a light aircraft.'], b:['I','Predict tomorrow’s storm track from today’s data.'] },
-  { id:'q2',  a:['R','Weld a steel gate that will last fifty years.'], b:['A','Photograph a country town for a book.'] },
-  { id:'q3',  a:['R','Clear storm-damaged trees after a cyclone.'], b:['S','Help an elderly man get his affairs in order.'] },
-  { id:'q4',  a:['R','Fit out a campervan from bare metal.'], b:['E','Sell fifty campervans.'] },
-  { id:'q5',  a:['R','Lay a dry-stone wall by hand.'], b:['C','Reconcile a warehouse stock count to the last item.'] },
-  { id:'q6',  a:['I','Identify a plant nobody else can name.'], b:['A','Design the look of a new board game.'] },
-  { id:'q7',  a:['I','Reconstruct exactly how an accident happened.'], b:['S','Support the person it happened to.'] },
-  { id:'q8',  a:['I','Find out why one shop outsells its twin across town.'], b:['E','Run a campaign that changes the result of a local vote.'] },
-  { id:'q9',  a:['I','Investigate why a bridge keeps cracking.'], b:['C','Keep the maintenance records that prove it’s safe.'] },
-  { id:'q10', a:['A','Choreograph a dance for a school concert.'], b:['S','Mentor an apprentice through their first year.'] },
-  { id:'q11', a:['A','Design a shopfront people stop to look at.'], b:['E','Open a market stall and grow it into a shop.'] },
-  { id:'q12', a:['A','Style a room for a theatre set.'], b:['C','Plan a road trip with every booking confirmed.'] },
-  { id:'q13', a:['S','Run a support group for new parents.'], b:['E','Start a local club and grow it to 200 members.'] },
-  { id:'q14', a:['S','Show a newcomer around and introduce them to everyone.'], b:['C','Set up a filing system an office will still use in ten years.'] },
-  { id:'q15', a:['E','Close a deal on a handshake.'], b:['C','Read the contract line by line before anyone signs.'] }
-];
-const FRIEND_PAIRS = ['p1','p3','p5','p6','p8','p10','p12','p13','p15'];
-
 /* Part 2: O*NET Mini Interest Profiler (Mini-IP), 30 items, five per RIASEC type, in the published order
    (Rounds, Ming, Cao, Song & Lewis, 2016). From the O*NET Career Exploration Tools by the U.S. Department of Labor,
    Employment and Training Administration (USDOL/ETA), used under the O*NET Tools Developer License
@@ -147,18 +110,19 @@ const TRAITS = {
 };
 const TRAIT_ORDER = ['ex','wa','or','st','cu'];
 
-/* Part 4: working conditions. -2 = left pole, +2 = right pole */
+/* Part 4: working conditions, each backed by O*NET work-context data (see tools/onet/build_onet.py).
+   -2 = left pole, +2 = right pole */
 const COND = [
-  { k:'var', lo:'Steady, predictable days', hi:'Every day different' },
-  { k:'ppl', lo:'Mostly on my own', hi:'Around people all day', flo:'Mostly on their own', fhi:'Around people all day' },
-  { k:'out', lo:'Indoors', hi:'Outdoors, weather and all', flo:'Indoors', fhi:'Outdoors, weather and all' },
-  { k:'aut', lo:'Clear instructions', hi:'Making my own calls', flo:'Following clear instructions', fhi:'Making their own calls' },
-  { k:'brd', lo:'Master one thing deeply', hi:'Juggle lots of different things' },
-  { k:'imm', lo:'Long projects, payoff later', hi:'See the result the same day' },
-  { k:'stk', lo:'Calm and low stakes', hi:'High stakes, adrenaline', flo:'Calm and low stakes', fhi:'High stakes, adrenaline' },
-  { k:'vis', lo:'Quietly behind the scenes', hi:'Out front and visible' },
-  { k:'rsk', lo:'Secure, steady pay', hi:'Riskier, bigger upside' }
+  { k:'var',  lo:'Steady, predictable days', hi:'Every day different' },
+  { k:'ppl',  lo:'Mostly on my own', hi:'Around people all day' },
+  { k:'out',  lo:'Indoors', hi:'Outdoors, weather and all' },
+  { k:'aut',  lo:'Clear instructions', hi:'Making my own calls' },
+  { k:'stk',  lo:'Calm and low stakes', hi:'High stakes, under pressure' },
+  { k:'vis',  lo:'Quietly behind the scenes', hi:'Out front, dealing with the public' },
+  { k:'phys', lo:'Mostly sitting', hi:'On my feet and moving' }
 ];
+/* Work from home: answers to the separate question; jobs use Dingel & Neiman's rules (wfh in onet.js). */
+const WFH = [['need','I need to work from home'],['like','I’d like the option'],['any','It doesn’t matter to me'],['site','I’d rather be on site']];
 const COND_KEYS = COND.map(c => c.k);
 
 /* Part 4: work values from the Theory of Work Adjustment (Dawis & Lofquist), as O*NET defines them.
@@ -171,8 +135,6 @@ const WORK_VALUES = [
   { k:'sup', n:'Support', d:'An employer and managers who back you and treat you fairly.' },
   { k:'wc',  n:'Working conditions', d:'Good pay, job security, some variety and a comfortable setup.' }
 ];
-const FRIEND_COND = ['ppl','out','aut','stk'];
-
 /* Refining round */
 const DEEP = [
   { id:'d1', q:'Describe a time you completely lost track of time. What were you doing?', tagq:'What made it so absorbing? Pick up to two.' },

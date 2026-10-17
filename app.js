@@ -1,5 +1,5 @@
 /* ===== Bearing: app ===== */
-const KEY = 'bearing.v1';
+const KEY = 'bearing.v2'; // v2 (October 2026): new questions; earlier saved runs are not carried over
 const TIER = ['S','A','B','C','D'];
 const TIER_NAME = { S:'Top match', A:'Strong match', B:'Good match', C:'Possible', D:'Unlikely' };
 // Label column: first word large, the rest small underneath ("Top" / "match").
@@ -36,9 +36,9 @@ function decode(code){
 }
 
 /* ---------- state ---------- */
-function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, pairs:{}, mip:{}, ipip:{}, values:[], cond:{},
-  exp:{ skills:[], q:null }, expSkipped:false, refine:{ pairs:{}, deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, minPay:0 }; }
-function freshF(){ return { for:'', by:'', pairs:{}, ipip:{}, cond:{}, text:'' }; }
+function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, mip:{}, ipip:{}, values:[], wfh:null, cond:{},
+  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, minPay:0 }; }
+function freshF(){ return { for:'', by:'', ipip:{}, text:'' }; }
 let S = fresh(), F = null;
 const HOSTED = typeof window!=='undefined' && window.BEARING_HOSTED===true;
 const SKEY = 'bearing.settings';
@@ -88,7 +88,7 @@ function buildFeedback(){
       interests:Object.fromEntries(ORDER.map(t=>[t,r2(P.rel[t])])),
       traits:Object.fromEntries(TRAIT_ORDER.map(k=>[k,r2(P.selfTraits[k])])),
       conditions:Object.fromEntries(COND_KEYS.map(k=>[k,S.cond[k]??null])),
-      stories:S.stories, stories_also:S.stories2||{}, pairs:S.pairs, activities:S.mip||{}, values:S.values||[], ratings:S.ipip,
+      stories:S.stories, stories_also:S.stories2||{}, activities:S.mip||{}, values:S.values||[], work_from_home:S.wfh, ratings:S.ipip,
       refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
@@ -118,7 +118,7 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify({S,F})); }catch(e
 function load(){ try{ const raw = localStorage.getItem(KEY); if(raw){ const o=JSON.parse(raw); if(o && o.S){ S=Object.assign(fresh(),o.S); F=o.F||null; } } }catch(e){} }
 
 /* ---------- screen lists ---------- */
-const SECS = {interlude:5, story:28, pair:10, mip:25, values:40, ipip:30, cond:25, exp:45, roles:60, deep:60, drain:15, fname:20, fpair:10, fipip:30, fcond:30, ftext:30, fdone:0};
+const SECS = {interlude:5, story:28, mip:25, values:40, wfh:12, ipip:30, cond:25, exp:45, roles:60, deep:60, drain:15, fname:20, fpair:10, fipip:30, fcond:30, ftext:30, fdone:0};
 const secsOf = list => list.reduce((a,x)=>a+(SECS[x.type]??10),0);
 const minsOf = list => Math.max(1, Math.round(secsOf(list)/60));
 function chunk(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
@@ -131,7 +131,8 @@ function quickScreens(){
   chunk(IPIP,5).forEach(items=>s.push({type:'ipip', items, part:3}));
   s.push({type:'interlude', part:4, title:'What you need', text:'First, rank what you need work to give you. Then, where you’d sit between two ways a working day can go. The middle is fine if you genuinely don’t mind.'});
   s.push({type:'values', part:4});
-  chunk(COND,3).forEach(items=>s.push({type:'cond', items, part:4}));
+  chunk(COND,4).forEach(items=>s.push({type:'cond', items, part:4}));
+  s.push({type:'wfh', part:4});
   s.push({type:'exp', part:5});
   s.push({type:'roles', part:5});
   return s;
@@ -171,18 +172,7 @@ function valuesFit(j, st){
 }
 function selfRaw(st){
   const raw={R:0,I:0,A:0,S:0,E:0,C:0};
-  if(hasMip(st)){
-    MINI_IP.forEach(it=>{ const v=st.mip[it.id]; if(typeof v==='number') raw[it.k]+=v; });
-    if(st.useHistory) (st.roles||[]).forEach(r=>{ const v=roleVerdict(r); const d={fuel:1.5, skill:-1, again:0.75}[v.k]||0; (r.types||[]).forEach(t=>raw[t]+=d); });
-    return raw;
-  }
-  // Results saved before the Mini-IP: the original story and trade-off scoring.
-  Object.values(st.stories).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=2; });
-  Object.values(st.stories2||{}).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=1; });
-  const scorePairs = (ans, list) => list.forEach(p=>{ const a=ans[p.id]; if(a==='a') raw[p.a[0]]+=2; else if(a==='b') raw[p.b[0]]+=2; else if(a==='A') raw[p.a[0]]+=3; else if(a==='B') raw[p.b[0]]+=3; else if(a==='both'){ raw[p.a[0]]+=1; raw[p.b[0]]+=1; } });
-  scorePairs(st.pairs, PAIRS); scorePairs(st.refine.pairs, PAIRS_REFINE);
-  Object.values(st.refine.deep).forEach(d=>(d.tags||[]).forEach(t=>raw[t]+=1.5));
-  (st.refine.drain||[]).forEach(t=>raw[t]-=1.5);
+  MINI_IP.forEach(it=>{ const v=(st.mip||{})[it.id]; if(typeof v==='number') raw[it.k]+=v; });
   if(st.useHistory) (st.roles||[]).forEach(r=>{ const v=roleVerdict(r); const d={fuel:1.5, skill:-1, again:0.75}[v.k]||0; (r.types||[]).forEach(t=>raw[t]+=d); });
   return raw;
 }
@@ -194,19 +184,14 @@ function roleVerdict(r){
   if(r.enjoy===0) return { k:'drain', label:'Not for you', text:'Neither enjoyable nor a strength. Little reason to head back this way.' };
   return { k:'mixed', label:'Mixed', text:'Some good, some not. It neither pulls you toward this work nor away from it.' };
 }
-function friendRaw(fd){
-  const raw={R:0,I:0,A:0,S:0,E:0,C:0}; let n=0;
-  FRIEND_PAIRS.forEach(id=>{ const p=PAIRS.find(x=>x.id===id); const a=fd.pairs[id]; if(a==='a'){raw[p.a[0]]+=1;n++;} else if(a==='b'){raw[p.b[0]]+=1;n++;} });
-  return n ? raw : null;
-}
 function traitsFrom(ans, items){
   const by={}; items.forEach(it=>{ const v=ans[it.id]; if(v){ (by[it.k]=by[it.k]||[]).push(it.r? 6-v : v); } });
   const o={}; TRAIT_ORDER.forEach(k=>{ o[k] = by[k] ? (mean(by[k])-3)/2 : null; }); return o;
 }
 function profile(st){
   const self = relFrom(selfRaw(st));
-  const fr = (st.friends||[]).map(f=>({ name:f.data.by||'A friend', rel: friendRaw(f.data) ? relFrom(friendRaw(f.data)) : null,
-    traits: traitsFrom(f.data.ipip||{}, IPIP.filter(i=>i.f)), cond: f.data.cond||{}, text:f.data.text||'' }));
+  const fr = (st.friends||[]).map(f=>({ name:f.data.by||'A friend', rel: null,
+    traits: traitsFrom(f.data.ipip||{}, IPIP.filter(i=>i.f && i.k!=='st')), text:f.data.text||'' }));
   // Friends' answers are shown beside yours for comparison; they don't change your scores or matches.
   const rel = {...self};
   const selfTraits = traitsFrom(st.ipip, IPIP), traits = {...selfTraits};
@@ -232,6 +217,8 @@ function scoreJobs(P, st){
   const out = JOBS.map(j=>{
     const r = 0.6*((pearson(P.rel, j.ri || jobVec(j.code))+1)/2) + 0.4*congruence(topTypes, j.code);
     let cw=0, cd=0; COND_KEYS.forEach((k,i)=>{ const c=P.cond[k]; if(c===null||c===undefined) return; const w=0.5+Math.abs(c)/2; cw+=w; cd+=w*Math.abs(c-j.c[i]); });
+    const wf = S.wfh==='need' ? 1.5 : S.wfh==='like' ? 0.75 : 0;
+    if(wf && j.wfh!==null && j.wfh!==undefined){ cw+=wf; cd+=wf*4*(1-j.wfh); }
     const cf = cw ? 1 - cd/(4*cw) : 0.5;
     const tk = Object.keys(j.tr||{}); let tf=0.5;
     if(tk.length){ let num=0, den=0; tk.forEach(k=>{ const z=P.traits[k]; if(z!==null){ num+=z*j.tr[k]; den+=Math.abs(j.tr[k]); } }); if(den) tf=0.5+0.5*num/den; }
@@ -263,6 +250,8 @@ function reasons(o, P, topTypes){
   Object.entries(j.tr||{}).forEach(([k,v])=>{ const z=P.traits[k]; if(z===null||v<0.5) return;
     if(z>=0.3) why.push(`Your ${TRAITS[k].name.toLowerCase()} suits it.`);
     else if(z<=-0.3) watch.push(`It asks a lot of ${TRAITS[k].name.toLowerCase()}, which came out lower for you.`); });
+  if((S.wfh==='need'||S.wfh==='like') && j.wfh!==null && j.wfh!==undefined){
+    if(j.wfh>=1) why.push('Can often be done from home.'); else if(j.wfh<=0) watch.push('Usually done on site, not from home.'); }
   if(o.vf!==null && o.vf!==undefined && j.values){
     const top=S.values[0], wv=WORK_VALUES.find(v=>v.k===top), jv=j.values[WORK_VALUES.indexOf(wv)];
     if(jv>=5.5) why.push(`Strong on what you need most: ${wv.n.toLowerCase()}.`);
@@ -449,7 +438,7 @@ function incomingBanner(){
     ${APK_URL ? `<p style="margin-top:12px"><a href="${esc(APK_URL)}">Don’t have the app? Download it</a></p>` : ''}</section>`;
 }
 function intro(){
-  const inProgress = (S.phase==='intro') && (Object.keys(S.stories).length || Object.keys(S.pairs).length || Object.keys(S.mip||{}).length);
+  const inProgress = (S.phase==='intro') && (Object.keys(S.stories).length || Object.keys(S.mip||{}).length);
   const hasResults = S.done;
   const PS = (inProgress||hasResults) ? partStatus() : {};
   const mins = Math.floor(secsOf(quickScreens())/60); // rounded down: the last two parts are optional
@@ -507,22 +496,9 @@ function question(){
         ${it.none ? `<div class="pair-alt"><button class="chipbtn" data-act="story-none" data-id="${it.id}" aria-pressed="${S.stories[it.id]==='none'}">${esc(it.none)}</button></div>` : ''}
         ${SET.ai ? `<details class="saymore" ${S.storyText[it.id]?'open':''}><summary>Add it in your own words (optional, used by the AI coach)</summary><textarea id="st-${it.id}" placeholder="Who, what, why it stuck with you…">${esc(S.storyText[it.id]||'')}</textarea></details>` : ''}</section>
         <div class="nav">${back}<button class="btn" data-act="next" ${S.stories[it.id]?'':'disabled'}>Next</button></div>`; break; }
-    case 'pair': case 'fpair': {
-      const it=sc.item; const store = sc.type==='fpair'? F.pairs : (sc.set==='refine'? S.refine.pairs : S.pairs);
-      const sides = flip(it.id)? [['b',it.b],['a',it.a]] : [['a',it.a],['b',it.b]]; const cur=store[it.id];
-      const q = sc.type==='fpair' ? `Which would <span class="friendq">${esc(nm())}</span> come home happier from?` : 'Which would you rather spend a day doing?';
-      const weighted = sc.set==='refine', fr = sc.type==='fpair';
-      const [L,R] = sides; const lean = cur && cur.toLowerCase();
-      // Left-to-right scale under the two cards. Values are the same ones scoring already uses (A/a/both/b/B).
-      const steps = fr ? [[L[0],'\u2190','This one'],[R[0],'\u2192','This one']]
-        : weighted ? [[L[0].toUpperCase(),'\u2190\u2190','Much rather'],[L[0],'\u2190','Rather'],['both','=','Equal'],[R[0],'\u2192','Rather'],[R[0].toUpperCase(),'\u2192\u2192','Much rather']]
-        : [[L[0],'\u2190','Rather this'],['both','=','Equal'],[R[0],'\u2192','Rather this']];
-      body = `<section class="screen"><div class="q">${q}</div><p class="hint">${fr ? `Tap the one ${esc(nm())} would enjoy more. Skip it if you can\u2019t tell.` : 'Tap a card, or use the row below to show how strongly you lean.'}</p>
-        <div class="pair">${[L,R].map(([k,v],n)=>`${n?'<span class="pair-or" aria-hidden="true">or</span>':''}<button class="opt" data-act="pick" data-id="${it.id}" data-v="${k}" aria-pressed="${lean===k}">${esc(v[1])}</button>`).join('')}</div>
-        ${fr ? '' : `<div class="pairscale" role="group" aria-label="How strongly you lean" style="--n:${steps.length}">${steps.map(([v,ic,l])=>`<button data-act="pick" data-id="${it.id}" data-v="${v}" aria-pressed="${cur===v}"><span class="ic" aria-hidden="true">${ic}</span><span>${l}</span></button>`).join('')}</div>`}
-        <div class="pair-alt">${fr ? `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="skip" aria-pressed="${cur==='skip'}">Skip</button>`
-          : `<button class="chipbtn" data-act="pick" data-id="${it.id}" data-v="none" aria-pressed="${cur==='none'}">Neither appeals</button>`}</div></section>
-        <div class="nav">${back}<button class="btn ghost" data-act="next" ${cur?'':'disabled'}>Next</button></div>`; break; }
+    case 'wfh': {
+      body = `<section class="screen"><div class="q">How much does working from home matter to you?</div><div class="opts">${WFH.map(([k,l])=>`<button class="opt" data-act="wfh" data-v="${k}" aria-pressed="${S.wfh===k}">${l}</button>`).join('')}</div></section>
+        <div class="nav">${back}<button class="btn" data-act="next" ${S.wfh?'':'disabled'}>Next</button></div>`; break; }
     case 'values': {
       const r=S.values||[], done=r.length===WORK_VALUES.length;
       body = `<section class="screen"><div class="q">What do you most need work to give you?</div><p class="hint">Tap them in order, most important first. Tap one again to take it out.</p><div class="opts">${shuffle(WORK_VALUES,'values').map(v=>{ const i=r.indexOf(v.k);
@@ -540,10 +516,10 @@ function question(){
         ${sc.items.map(i=>`<div class="scale-item"><div>${sc.type==='fipip' ? esc(nm())+' '+esc(i.f) : esc(i.t)}</div><div class="scale" role="group" aria-label="${esc(i.t)}">${[1,2,3,4,5].map(v=>`<button data-act="rate" data-id="${i.id}" data-v="${v}" aria-pressed="${store[i.id]===v}" aria-label="${v}">${v}</button>`).join('')}</div>
           <div class="anchors"><span>Very unlike</span>${sc.type==='fipip'?`<button class="chipbtn sm" data-act="rate" data-id="${i.id}" data-v="0" aria-pressed="${store[i.id]===0}">Skip</button>`:''}<span>Very like</span></div></div>`).join('')}</div></section>
         <div class="nav">${back}<button class="btn" data-act="next" ${all?'':'disabled'}>Next</button></div>`; break; }
-    case 'cond': case 'fcond': {
-      const items = sc.type==='fcond' ? COND.filter(c=>FRIEND_COND.includes(c.k)) : sc.items; const store = sc.type==='fcond'? F.cond : S.cond;
-      const all = items.every(c=>store[c.k]!==undefined); const fr = sc.type==='fcond';
-      body = `<section class="screen"><div class="q">${sc.type==='fcond' ? `Where does <span class="friendq">${esc(nm())}</span> seem happiest?` : 'Where would you sit between these?'}</div><div>
+    case 'cond': {
+      const items = sc.items, store = S.cond, fr = false;
+      const all = items.every(c=>store[c.k]!==undefined);
+      body = `<section class="screen"><div class="q">Where would you sit between these?</div><div>
         ${items.map(c=>`<div class="scale-item"><div class="anchors" style="font-size:15px;color:var(--ink)"><span>${fr?c.flo:c.lo}</span><span>${fr?c.fhi:c.hi}</span></div><div class="scale" role="group" aria-label="${esc(c.lo)} to ${esc(c.hi)}">${[-2,-1,0,1,2].map(v=>`<button data-act="cond" data-id="${c.k}" data-v="${v}" aria-pressed="${store[c.k]===v}" aria-label="${v}">${v===0?'•':(v<0?'←':'→').repeat(Math.abs(v))}</button>`).join('')}</div>${fr?`<div class="anchors" style="justify-content:center"><button class="chipbtn sm" data-act="cond" data-id="${c.k}" data-v="skip" aria-pressed="${store[c.k]==='skip'}">Skip</button></div>`:''}</div>`).join('')}</div></section>
         <div class="nav">${back}<button class="btn" data-act="next" ${all?'':'disabled'}>Next</button></div>`; break; }
     case 'exp': {
@@ -609,7 +585,7 @@ function compassSVG(P){
   const labels = ORDER.map(k=>{ const a=TYPES[k].deg*Math.PI/180, r=R+26; const x=r*Math.sin(a), y=-r*Math.cos(a);
     return `<text class="tl" x="${x.toFixed(1)}" y="${(y+2).toFixed(1)}" text-anchor="middle">${TYPES[k].name}</text><text x="${x.toFixed(1)}" y="${(y+15).toFixed(1)}" text-anchor="middle">${String(TYPES[k].deg).padStart(3,'0')}°</text>`; }).join('');
   const b=P.bearing, nl=needleLen(P,R);
-  const friendPoly = P.friends.filter(f=>f.rel).map(f=>`<polygon points="${pts(f.rel)}" fill="none" stroke="var(--orange)" stroke-width="2" stroke-dasharray="5 4"/>`).join('');
+  const friendPoly = [].map(f=>`<polygon points="${pts(f.rel)}" fill="none" stroke="var(--orange)" stroke-width="2" stroke-dasharray="5 4"/>`).join('');
   return `<svg class="compass" viewBox="-200 -168 400 343" role="img" aria-label="Compass showing your interest profile, bearing ${b.deg} degrees">
     ${[40,80,R].map(r=>`<circle r="${r}" fill="none" stroke="var(--line)" stroke-width="1"/>`).join('')}
     ${ORDER.map(k=>{ const a=TYPES[k].deg*Math.PI/180; return `<line x1="0" y1="0" x2="${(R*Math.sin(a)).toFixed(1)}" y2="${(-R*Math.cos(a)).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`; }).join('')}
@@ -645,7 +621,7 @@ async function drawSnapshot(){
   g.strokeStyle=C.muted; for(let d=0;d<360;d+=10){ const a=d*Math.PI/180, l=d%30===0?8:4; g.beginPath(); g.moveTo(R*Math.sin(a),-R*Math.cos(a)); g.lineTo((R+l)*Math.sin(a),-(R+l)*Math.cos(a)); g.stroke(); }
   const poly=(pts)=>{ g.beginPath(); pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y)); g.closePath(); };
   poly(radarXY(P,P.self,R)); g.globalAlpha=.18; g.fillStyle=C.accent; g.fill(); g.globalAlpha=1; g.strokeStyle=C.accent; g.lineWidth=2; g.stroke();
-  P.friends.filter(f=>f.rel).forEach(f=>{ poly(radarXY(P,f.rel,R)); g.setLineDash([5,4]); g.strokeStyle=C.muted; g.stroke(); g.setLineDash([]); });
+  [].forEach(f=>{ poly(radarXY(P,f.rel,R)); g.setLineDash([5,4]); g.strokeStyle=C.muted; g.stroke(); g.setLineDash([]); });
   const a=P.bearing.deg*Math.PI/180, nl=needleLen(P,R), nx=nl*Math.sin(a), ny=-nl*Math.cos(a);
   g.strokeStyle=C.ink; g.lineWidth=3; g.lineCap='round'; g.beginPath(); g.moveTo(0,0); g.lineTo(nx,ny); g.stroke();
   g.fillStyle=C.ink; g.beginPath(); g.arc(nx,ny,5,0,Math.PI*2); g.fill();
@@ -688,7 +664,8 @@ async function shareSnapshot(){
 function jobDetail(o){
   const j=o.j, slug=(j.sq||j.t).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   return `<div class="detail" id="d-${hash(j.t)}"><div><span class="eyebrow">${FIELDS[j.f].name}</span><h3>${esc(j.t)}</h3></div>
-    <div class="meta"><span><b>${TIER_NAME[o.tier]}</b></span><span>Pay <b>$${j.pay[0]}k–$${j.pay[1]}k</b> a year, indicative</span><span>Usual entry <b>${QUALS[j.q]}</b></span></div>
+    <div class="meta"><span><b>${TIER_NAME[o.tier]}</b></span><span>Pay <b>$${j.pay[0]}k–$${j.pay[1]}k</b> a year, indicative</span><span>Usual entry <b>${QUALS[j.q]}</b></span>${j.wfh===null||j.wfh===undefined?'':`<span>Work from home <b>${j.wfh>=1?'often possible':j.wfh>0?'sometimes':'usually not'}</b></span>`}</div>
+    ${clashes(o).length ? `<p class="clash">Clashes with your strongest answer${clashes(o).length>1?'s':''}: ${clashes(o).map(esc).join('; ').toLowerCase()}.</p>` : ''}
     ${o.ready ? `<div><span class="ready r${o.ready.lvl}">${READY[o.ready.lvl]}</span>${o.ready.carry.length?` <span class="muted" style="font-size:14px">Carries over: ${o.ready.carry.map(esc).join(', ')}</span>`:''}</div>` : ''}
     ${o.why.why.length ? `<div><div class="lbl">Why it fits</div><ul>${o.why.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div><div class="lbl">Match breakdown</div><div class="meters">${[['Interests',o.r],...(o.vf!==null&&o.vf!==undefined?[['Values',o.vf]]:[]),['Conditions',o.cf],['Personality',o.tf]].map(([l,v])=>`<div class="meter"><span>${l}</span><div class="bar"><i style="width:${Math.round(Math.max(0.04,Math.min(1,v))*100)}%"></i></div><b>${v>=0.75?'Strong':v>=0.55?'Fair':'Weak'}</b></div>`).join('')}</div></div>
@@ -736,17 +713,23 @@ function traitRows(P){
 }
 function lookFor(P){
   const need = hasValues(S) ? `<li>What you need most: ${S.values.slice(0,2).map(k=>WORK_VALUES.find(v=>v.k===k).n.toLowerCase()).join(', then ')}.</li>` : '';
-  return need + COND.map(c=>({c, v:P.cond[c.k]})).filter(x=>x.v!==null && Math.abs(x.v)>=1).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,4)
+  const home = S.wfh==='need' ? '<li>Work you can do from home.</li>' : S.wfh==='like' ? '<li>The option to work from home.</li>' : '';
+  return need + home + COND.map(c=>({c, v:P.cond[c.k]})).filter(x=>x.v!==null && Math.abs(x.v)>=1).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,4)
     .map(x=>`<li>${x.v>0?x.c.hi:x.c.lo}</li>`).join('') || '<li>You were flexible on working conditions, so they didn’t narrow things much.</li>';
 }
 let LAST = [];
-function payLabel(){ const v=S.minPay||0; const mq=S.maxQ??4; const hidden=LAST.filter(o=>o.j.pay[1]<v || o.j.q>mq).length;
+function clashes(o){
+  const out=[]; COND.forEach((c,i)=>{ const p=S.cond[c.k]; if(Math.abs(p)===2 && Math.abs(p-o.j.c[i])>=3.5) out.push(p>0?c.hi:c.lo); /* the job sits clearly at the other end */ });
+  if(S.wfh==='need' && o.j.wfh===0) out.push('working from home');
+  return out;
+}
+function payLabel(){ const v=S.minPay||0; const mq=S.maxQ??4; const hidden=LAST.filter(o=>o.j.pay[1]<v || o.j.q>mq || (S.hideClash && clashes(o).length)).length;
   return (v ? `Can pay at least $${v}k` : 'Any pay') + (hidden ? ` \u00b7 ${hidden} hidden` : ''); }
 const TRAIN_OPTS = [[0,'None'],[1,'Certificate'],[2,'Diploma'],[3,'Degree'],[4,'Any']];
 function board(){
   const maxQ = S.maxQ===undefined||S.maxQ===null ? 4 : S.maxQ;
-  const list = LAST.filter(o=>o.j.pay[1] >= (S.minPay||0) && o.j.q <= maxQ);
-  if(!list.length) return `<div class="panel"><p style="margin:0">No jobs match both filters. Lower the minimum pay or allow more training to see more.</p></div>`;
+  const list = LAST.filter(o=>o.j.pay[1] >= (S.minPay||0) && o.j.q <= maxQ && !(S.hideClash && clashes(o).length));
+  if(!list.length) return `<div class="panel"><p style="margin:0">No jobs match your filters. Lower the minimum pay, allow more training, or show jobs that clash with your strongest answers.</p></div>`;
   return S.view==='fields' ? fieldBoard(list) : tierBoard(list);
 }
 function historySection(P, D){
@@ -765,15 +748,10 @@ function results(){
   const P = profile(S), D = directionOf(P), scored = scoreJobs(P, S); LAST = scored;
   const name = S.name ? esc(S.name)+'’s' : 'Your';
   const friendsHtml = P.friends.length ? `<section class="section"><h2>How others see you</h2>
-    <p class="muted" style="margin:0">The dashed orange outline on the compass and the hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view is there to compare with yours. It doesn’t change your matches.</p>
-    ${P.friends.filter(f=>f.text).map(f=>`<div class="panel"><div class="eyebrow">${esc(f.name)} says you’re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}
-    ${P.friends.filter(f=>f.rel).map(f=>{ const fb=bearingOf(f.rel); const diff=Math.abs(((fb.deg-P.bearing.deg+540)%360)-180); return `<p style="margin:0">${esc(f.name)}’s bearing for you: <b style="font-family:var(--mono)">${String(fb.deg).padStart(3,'0')}°</b>. ${diff<=30?'That’s close to how you see yourself.':diff<=75?'That’s a noticeably different angle from yours, worth talking about.':'That’s a very different read from yours. Ask them what they’ve seen.'}</p>`; }).join('')}</section>` : '';
+    <p class="muted" style="margin:0">The hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view is there to compare with yours. It doesn’t change your matches.</p>
+    ${P.friends.filter(f=>f.text).map(f=>`<div class="panel"><div class="eyebrow">${esc(f.name)} says you’re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}</section>` : '';
   const sCount = scored.filter(o=>o.tier==='S').length;
-  const upgrade = hasMip(S) && !hasValues(S) ? `<section class="section"><div class="panel offer"><span class="eyebrow">New question</span><h3>Rank what you need from work</h3>
-    <p style="margin:0">One quick question, about a minute. Your matches will then also weigh what each job offers against what matters most to you.</p>
-    <div class="cta-row"><button class="btn" data-act="values-update">Rank them</button></div></div></section>` : !hasMip(S) ? `<section class="section"><div class="panel offer"><span class="eyebrow">Updated questions</span><h3>Get sharper matches in about 3 minutes</h3>
-    <p style="margin:0">Bearing now uses 30 activity ratings from the O*NET Interest Profiler instead of the trade-off questions. Your other answers are kept.</p>
-    <div class="cta-row"><button class="btn" data-act="mip-update">Rate the activities</button></div></div></section>` : '';
+
   return `<main class="wide">
   <section class="res-head">
     <div>${compassSVG(P)}</div>
@@ -786,7 +764,6 @@ function results(){
       <div class="mix">${D.top.map((t,i)=>`<div class="mixrow ${i<2?'top':''}"><span>${TYPES[t].name}</span><div class="bar"><i style="width:${Math.max(4,100*(P.abs ? P.abs[t] : P.rel[t]/P.rel[D.top[0]])).toFixed(0)}%"></i></div><span>${P.abs ? absWord(P.abs[t]) : levelWord(P.rel[t]/P.rel[D.top[0]])}</span></div>`).join('')}</div>
     </div>
   </section>
-  ${upgrade}
   <section class="section grid2">
     <div><h2>Look for</h2><p class="muted" style="margin:4px 0 12px">Whatever job you pick, these were your strongest calls on how the day should run.</p><ul class="look">${lookFor(P)}</ul></div>
     <div><h2>How you run</h2><div style="margin-top:6px">${traitRows(P)}</div></div>
@@ -807,7 +784,8 @@ function results(){
       <button class="chipbtn sm" data-act="jump" data-v="ai-panel">AI coach</button>
       <button class="chipbtn sm" data-act="jump" data-v="opt-share">Keep or share</button></div>
     <div class="payfilter"><div class="frow"><label for="minpay" class="eyebrow">Minimum pay</label><input type="range" id="minpay" min="0" max="160" step="10" value="${S.minPay||0}"><span id="paylabel" class="paylabel"></span></div>
-      <div class="frow"><span class="eyebrow">Most training I\u2019d do</span><div class="chips">${TRAIN_OPTS.map(([v,l])=>`<button class="chipbtn sm" data-act="maxq" data-v="${v}" aria-pressed="${(S.maxQ??4)===v}">${l}</button>`).join('')}</div></div></div>
+      <div class="frow"><span class="eyebrow">Most training I\u2019d do</span><div class="chips">${TRAIN_OPTS.map(([v,l])=>`<button class="chipbtn sm" data-act="maxq" data-v="${v}" aria-pressed="${(S.maxQ??4)===v}">${l}</button>`).join('')}</div></div>
+      ${LAST.some(o=>clashes(o).length) ? `<div class="frow"><button class="toggle-sw" data-act="hide-clash" aria-pressed="${!!S.hideClash}"><span></span>Hide jobs that clash with my strongest answers</button><span class="muted" style="font-size:14px">${LAST.filter(o=>clashes(o).length).length} jobs clash.</span></div>` : ''}</div>
     <div id="board">${board()}</div>
   </section>
   <section class="section"><h2>Optional next steps</h2><div class="actions">
@@ -828,7 +806,7 @@ function results(){
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story questions are for reflection and don\u2019t change your matches. Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
+    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story questions are for reflection and don\u2019t change your matches. Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;
@@ -860,6 +838,7 @@ MY RESULTS`);
   L.push(`Direction: ${D.n}${D.key==='ALL'?'':` (bearing ${P.bearing.deg} degrees, ${leanLabel(P.bearing.strength).toLowerCase()})`}. Interest mix (Holland RIASEC): ${D.top.map(t=>`${TYPES[t].name} ${Math.round(P.rel[t]*100)}%`).join(', ')}.`);
   if(hasMip(S)){ const pick=v=>MINI_IP.filter(i=>S.mip[i.id]===v).map(i=>i.t.toLowerCase()); const sl=pick(4), sd=pick(0);
     if(sl.length) L.push('Activities I would strongly like: '+sl.join('; ')+'.'); if(sd.length) L.push('Activities I would strongly dislike: '+sd.join('; ')+'.'); }
+  if(S.wfh) L.push('Working from home: '+WFH.find(w=>w[0]===S.wfh)[1].toLowerCase()+'.');
   if(hasValues(S)) L.push('What I need most from work, in order (Theory of Work Adjustment values): '+S.values.map(k=>WORK_VALUES.find(v=>v.k===k).n).join(', ')+'.');
   L.push('Personality (Mini-IPIP Big Five): '+TRAIT_ORDER.filter(k=>P.selfTraits[k]!==null).map(k=>`${TRAITS[k].name} ${P.selfTraits[k]>0.25?'high':P.selfTraits[k]<-0.25?'low':'middle'}`).join('; ')+'.');
   const cs = COND.filter(c=>P.cond[c.k]!==null&&Math.abs(P.cond[c.k])>=1).map(c=>(Math.abs(P.cond[c.k])>=2?'strongly: ':'')+(P.cond[c.k]>0?c.hi:c.lo));
@@ -869,7 +848,7 @@ MY RESULTS`);
   const deep = DEEP.map(d=>{ const a=S.refine.deep[d.id]; return a&&(a.text||a.tags.length) ? `- ${d.q} ${a.text?`"${a.text}"`:''}${a.tags.length?` [what mattered: ${a.tags.map(t=>DEEP_TAGS[t].toLowerCase()).join('; ')}]`:''}` : ''; }).filter(Boolean);
   if(deep.length) L.push('\nIn my own words:\n'+deep.join('\n'));
   if(S.refine.drain && S.refine.drain.length) L.push('What drains me fastest: '+S.refine.drain.map(t=>DRAIN[t].toLowerCase()).join('; ')+'.');
-  P.friends.forEach(f=>{ const fb=f.rel?bearingOf(f.rel):null; L.push(`\nFriend's view (${f.name}): ${f.rel?`their read of my interests leans ${ORDER.slice().sort((a,b)=>f.rel[b]-f.rel[a]).slice(0,2).map(t=>TYPES[t].name).join(' and ')}.`:''}${f.text?` They say I'm better than I realise at: "${f.text}".`:''}`); });
+  P.friends.forEach(f=>{ const fb=f.rel?bearingOf(f.rel):null; L.push(`\nFriend's view (${f.name}):${f.text?` They say I'm better than I realise at: "${f.text}".`:''}`); });
   const roles=(S.roles||[]).filter(r=>r.t||r.types.length);
   if(roles.length) L.push('\nPast roles (judge these as evidence about what I enjoy and do well, not as a track to stay on):\n'+roles.map(r=>{ const v=roleVerdict(r); return `- ${r.t||'Unnamed role'}: mostly ${r.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'} work; good at it: ${r.good!=null?GOOD[r.good].toLowerCase():'?'}; enjoyed it: ${r.enjoy!=null?ENJOY[r.enjoy].toLowerCase():'?'} (${v.label.toLowerCase()})`; }).join('\n'));
   if(!S.expSkipped && S.exp.q!==null) L.push(`Qualification: ${QUALS[S.exp.q]}. Skills I've used a lot: ${S.exp.skills.map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase()).join(', ')||'not given'}.`);
@@ -896,8 +875,6 @@ function grabText(){
     if(a) F.for=a.value.trim().slice(0,40); if(b) F.by=b.value.trim().slice(0,40); if(c) F.text=c.value.slice(0,600); }
 }
 function next(){ grabText(); const list=screens(); if(S.idx<list.length-1) S.idx++; if(S.phase==='quick') S.reach=Math.max(S.reach||0,S.idx);
-  if(S.updatingMip && S.phase==='quick' && list[S.idx].part!==2){ S.updatingMip=false; S.phase='results'; window.scrollTo(0,0); }
-  if(S.updatingValues && S.phase==='quick' && list[S.idx].type!=='values'){ S.updatingValues=false; S.phase='results'; window.scrollTo(0,0); }
   save(); render(); }
 function profileCode(){ const {phase,idx,open,view,showD,showC,pendingFriends,pendingProfile,_confirmDelete,backPhase,resumePhase,prevPhase,fb,replyEmail,...rest}=S; return encode('BRG-P1.', rest); }
 
@@ -913,8 +890,6 @@ async function onClick(e){
     case 'show-results': S.phase='results'; save(); render(); break;
     case 'home': grabText(); if(S.phase==='words'){ S.phase='results'; save(); render(); break; } if(S.phase==='friend'){ S.phase = S.done?'results':'intro'; } else if(S.phase!=='results'){ S.resumePhase=S.phase; S.phase='intro'; } else S.phase='intro'; save(); render(); break;
     case 'next': next(); break;
-    case 'values-update': { S.updatingValues=true; S.phase='quick'; S.idx=quickScreens().findIndex(x=>x.type==='values'); save(); render(); break; }
-    case 'mip-update': { S.updatingMip=true; S.phase='quick'; S.idx=quickScreens().findIndex(x=>x.part===2); save(); render(); break; }
     case 'jump': { const el=document.getElementById(v); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); break; }
     case 'back': grabText(); S.idx=Math.max(0,S.idx-1); save(); render(); break;
     case 'story-none': { grabText(); S.stories[id]='none'; if(S.stories2) delete S.stories2[id]; save(); render(); setTimeout(next, 220); break; }
@@ -924,14 +899,15 @@ async function onClick(e){
       else if(!m){ S.stories[id]=v; }
       else { S.stories2[id]=v; }
       save(); render(); break; }
-    case 'pick': { const sc=screens()[S.idx]; const store = sc.type==='fpair'? F.pairs : sc.set==='refine'? S.refine.pairs : S.pairs; store[id]=v; save(); render(); setTimeout(next, 220); break; }
+    case 'wfh': { S.wfh=v; save(); render(); setTimeout(next, 220); break; }
     case 'mrate': { S.mip[id]=+v; save(); render(); break; }
     case 'vrank': { S.values=S.values||[]; const i=S.values.indexOf(v); if(i>=0) S.values.splice(i,1); else S.values.push(v);
       if(i<0 && S.values.length===WORK_VALUES.length-1) S.values.push(WORK_VALUES.find(x=>!S.values.includes(x.k)).k); // the last one ranks itself
       save(); render(); break; }
+    case 'hide-clash': { S.hideClash=!S.hideClash; save(); render(); break; }
     case 'vreset': { S.values=[]; save(); render(); break; }
     case 'rate': { const sc=screens()[S.idx]; (sc.type==='fipip'?F.ipip:S.ipip)[id]=+v; save(); render(); break; }
-    case 'cond': { const sc=screens()[S.idx]; (sc.type==='fcond'?F.cond:S.cond)[id]= v==='skip' ? 'skip' : +v; save(); render(); break; }
+    case 'cond': { S.cond[id]= +v; save(); render(); break; }
     case 'role-add': grabText(); S.roles.push({t:'',types:[],good:null,enjoy:null}); save(); render();
       { const el=document.getElementById('role-'+(S.roles.length-1)); if(el) el.closest('.role').scrollIntoView({behavior:'smooth',block:'start'}); } break;
     case 'role-del': grabText(); S.roles.splice(+v,1); save(); render(); break;

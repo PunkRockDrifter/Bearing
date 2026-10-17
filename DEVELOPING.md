@@ -86,3 +86,12 @@ The `android/` folder is a small Android app that wraps this web app, and `.gith
 ## Later: Google Play
 
 Once it's hosted, it can be wrapped as an Android app with Bubblewrap (a Trusted Web Activity). That needs a `.well-known/assetlinks.json` file on the site to prove you own it, and a Google Play developer account.
+
+## Rebuilding the O*NET job data
+
+`onet.js` is generated. To rebuild it (for example for a new O*NET release):
+
+1. Download the O*NET CSV database (`db_<version>_csv.zip`) from https://www.onetcenter.org/database.html and unzip it, plus the O*NET 30.2 `Work Values.txt` (work values were dropped from O*NET after 30.2).
+2. Run `python3 tools/onet/build_onet.py <csv folder> <Work Values.txt> > onet.js`.
+
+`tools/onet/mapping.py` holds the hand-checked match from each Bearing job to an O*NET occupation, and the ratings for jobs O*NET doesn't cover. Working conditions are percentiles on O*NET work-context items; work from home uses Dingel and Neiman's (2020) rules. Data: USDOL/ETA, CC BY 4.0.
