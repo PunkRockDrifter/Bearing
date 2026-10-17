@@ -113,7 +113,7 @@ RATER = {
     'Australian Defence Force Member': {
         'src': 'Rated by an experienced rater (10 years working with the ADF), as a general average across roles; not O*NET data',
         'ri': [6, 5, 2, 5, 6, 5], 'z': 2, 'v': [7, 4, 7, 6, 3, 3],
-        # conditions in COND order (var, ppl, out, aut, stk, vis, phys), -2..2, carried over from the hand-set profile
-        'c': [1, 1, 1, -2, 2, 0, 1.5], 'wfh': 0,  # hand-set placeholder, to confirm with the rater
+        # conditions in COND order (var, ppl, out, aut, stk, vis, phys), -2..2
+        'c': [1.5, 1.5, 1.5, -2, 2, 0, 1.5], 'wfh': 0,  # rated by the same rater
     },
 }

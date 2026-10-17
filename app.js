@@ -324,7 +324,7 @@ function render(){
   else if(S.phase==='results') html += results();
   else html += question();
   app().innerHTML = html;
-  const pl=document.getElementById('paylabel'); if(pl) pl.textContent=payLabel();
+  refreshFilters();
   window.scrollTo(0, view===lastView ? y : 0);
   if(S.phase==='results' && view!==lastView) animateCompass();
   lastView = view;
@@ -661,6 +661,25 @@ async function shareSnapshot(){
   if(NATIVE){ window.BearingNative.share(title, text); return; } // older app builds: text only
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='my-bearing.png'; document.body.appendChild(a); a.click(); a.remove(); toast('Picture saved to your downloads');
 }
+const band = v => v>=0.75 ? 'Strong' : v>=0.55 ? 'Fair' : 'Weak';
+function fitRows(o){
+  const j=o.j, P=profile(S), mine=ORDER.slice().sort((a,b)=>P.rel[b]-P.rel[a]).slice(0,2).map(t=>TYPES[t].name);
+  const rows=[['Interests', o.r, `Mostly ${j.code.slice(0,2).split('').map(t=>TYPES[t].name).join(' and ')} work. Your strongest pulls are ${mine.join(' and ')}.`]];
+  if(o.vf!==null && o.vf!==undefined && j.values){
+    const need=WORK_VALUES.find(v=>v.k===S.values[0]), x=j.values[WORK_VALUES.indexOf(need)];
+    rows.push(['Values', o.vf, `Offers ${x>=5.5?'a lot of':x>=4?'some':'little'} ${need.n.toLowerCase()}, your top need.`]);
+  }
+  const calls=COND.map((c,i)=>({c,p:S.cond[c.k],jv:j.c[i]})).filter(x=>typeof x.p==='number' && Math.abs(x.p)>=1);
+  const fits=calls.filter(x=>Math.sign(x.p)===Math.sign(x.jv) && Math.abs(x.jv)>=0.5).length, cl=clashes(o);
+  let cr = calls.length ? `Matches ${fits} of your ${calls.length} clearer calls on the working day.` : 'You were flexible on working conditions.';
+  if(cl.length) cr += ` Clashes on ${cl.join('; ').toLowerCase()}.`;
+  else if((S.wfh==='need'||S.wfh==='like') && j.wfh!==null && j.wfh!==undefined) cr += j.wfh>=1 ? ' Can often be done from home.' : j.wfh>0 ? ' Sometimes possible from home.' : ' Usually done on site.';
+  rows.push(['Conditions', o.cf, cr]);
+  rows.push(o.ready ? ['Readiness', [1,0.6,0.25][o.ready.lvl], READY[o.ready.lvl]+'.'+(o.ready.carry.length?` Carries over: ${o.ready.carry.join(', ').toLowerCase()}.`:''), READY[o.ready.lvl]]
+                    : ['Readiness', null, 'Answer the optional experience questions to see how close you are.']);
+  rows.push(['Personality', o.tf, 'Plays a small part in the ranking.']);
+  return `<div class="fits">${rows.map(([l,v,r,w])=>`<div class="fitrow"><span class="fl">${l}</span>${v===null?'<span class="fw muted">Not assessed</span>':`<div class="bar"><i style="width:${Math.round(Math.max(0.04,Math.min(1,v))*100)}%"></i></div><b class="fw">${w||band(v)}</b>`}<p class="fr">${esc(r)}</p></div>`).join('')}</div>`;
+}
 function jobDetail(o){
   const j=o.j, slug=(j.sq||j.t).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   return `<div class="detail" id="d-${hash(j.t)}"><div><span class="eyebrow">${FIELDS[j.f].name}</span><h3>${esc(j.t)}</h3></div>
@@ -668,7 +687,7 @@ function jobDetail(o){
     ${clashes(o).length ? `<p class="clash">Clashes with your strongest answer${clashes(o).length>1?'s':''}: ${clashes(o).map(esc).join('; ').toLowerCase()}.</p>` : ''}
     ${o.ready ? `<div><span class="ready r${o.ready.lvl}">${READY[o.ready.lvl]}</span>${o.ready.carry.length?` <span class="muted" style="font-size:14px">Carries over: ${o.ready.carry.map(esc).join(', ')}</span>`:''}</div>` : ''}
     ${o.why.why.length ? `<div><div class="lbl">Why it fits</div><ul>${o.why.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-    <div><div class="lbl">Match breakdown</div><div class="meters">${[['Interests',o.r],...(o.vf!==null&&o.vf!==undefined?[['Values',o.vf]]:[]),['Conditions',o.cf],['Personality',o.tf]].map(([l,v])=>`<div class="meter"><span>${l}</span><div class="bar"><i style="width:${Math.round(Math.max(0.04,Math.min(1,v))*100)}%"></i></div><b>${v>=0.75?'Strong':v>=0.55?'Fair':'Weak'}</b></div>`).join('')}</div></div>
+    <div><div class="lbl">How it fits</div>${fitRows(o)}</div>
     ${(o.why.not.length||o.why.watch.length) ? `<div><div class="lbl">${o.tier==='S'?'Watch for':'Why it\u2019s not higher'}</div><ul>${o.why.not.concat(o.why.watch).map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div><div class="lbl">A day in the life</div><p>${esc(j.day)}</p></div>
     <div><div class="lbl">How people get in</div><p>${esc(j.path)}</p></div>
@@ -723,12 +742,16 @@ function clashes(o){
   if(S.wfh==='need' && o.j.wfh===0) out.push('working from home');
   return out;
 }
-function payLabel(){ const v=S.minPay||0; const mq=S.maxQ??4; const hidden=LAST.filter(o=>o.j.pay[1]<v || o.j.q>mq || (S.hideClash && clashes(o).length)).length;
-  return (v ? `Can pay at least $${v}k` : 'Any pay') + (hidden ? ` \u00b7 ${hidden} hidden` : ''); }
+const shown = o => o.j.pay[1] >= (S.minPay||0) && o.j.q <= (S.maxQ??4) && !(S.hideClash && clashes(o).length);
+function payLabel(){ const v=S.minPay||0; return v ? `At least $${v}k` : 'Any pay'; }
+function refreshFilters(){
+  const pl=document.getElementById('paylabel'); if(pl) pl.textContent=payLabel();
+  const fs=document.getElementById('filtersum'); if(fs){ const h=LAST.filter(o=>!shown(o)).length; fs.textContent = h ? `${h} of ${LAST.length} jobs hidden` : `Showing all ${LAST.length} jobs`; }
+}
 const TRAIN_OPTS = [[0,'None'],[1,'Certificate'],[2,'Diploma'],[3,'Degree'],[4,'Any']];
 function board(){
   const maxQ = S.maxQ===undefined||S.maxQ===null ? 4 : S.maxQ;
-  const list = LAST.filter(o=>o.j.pay[1] >= (S.minPay||0) && o.j.q <= maxQ && !(S.hideClash && clashes(o).length));
+  const list = LAST.filter(shown);
   if(!list.length) return `<div class="panel"><p style="margin:0">No jobs match your filters. Lower the minimum pay, allow more training, or show jobs that clash with your strongest answers.</p></div>`;
   return S.view==='fields' ? fieldBoard(list) : tierBoard(list);
 }
@@ -783,9 +806,10 @@ function results(){
       <button class="chipbtn sm" data-act="jump" data-v="opt-friend">Ask a friend</button>
       <button class="chipbtn sm" data-act="jump" data-v="ai-panel">AI coach</button>
       <button class="chipbtn sm" data-act="jump" data-v="opt-share">Keep or share</button></div>
+    <details class="filters" id="filters" ${S.filtersOpen?'open':''}><summary><span class="eyebrow">Filter</span> <span id="filtersum"></span></summary>
     <div class="payfilter"><div class="frow"><label for="minpay" class="eyebrow">Minimum pay</label><input type="range" id="minpay" min="0" max="160" step="10" value="${S.minPay||0}"><span id="paylabel" class="paylabel"></span></div>
       <div class="frow"><span class="eyebrow">Most training I\u2019d do</span><div class="chips">${TRAIN_OPTS.map(([v,l])=>`<button class="chipbtn sm" data-act="maxq" data-v="${v}" aria-pressed="${(S.maxQ??4)===v}">${l}</button>`).join('')}</div></div>
-      ${LAST.some(o=>clashes(o).length) ? `<div class="frow"><button class="toggle-sw" data-act="hide-clash" aria-pressed="${!!S.hideClash}"><span></span>Hide jobs that clash with my strongest answers</button><span class="muted" style="font-size:14px">${LAST.filter(o=>clashes(o).length).length} jobs clash.</span></div>` : ''}</div>
+      ${LAST.some(o=>clashes(o).length) ? `<div class="frow"><button class="toggle-sw" data-act="hide-clash" aria-pressed="${!!S.hideClash}"><span></span>Hide jobs that clash with my strongest answers</button><span class="muted" style="font-size:14px">${LAST.filter(o=>clashes(o).length).length} jobs clash.</span></div>` : ''}</div></details>
     <div id="board">${board()}</div>
   </section>
   <section class="section"><h2>Optional next steps</h2><div class="actions">
@@ -924,7 +948,7 @@ async function onClick(e){
     case 'finish-refine': S.refineDone=true; S.phase='results'; save(); render(); toast('Results updated'); break;
     case 'refine': S.phase='refine'; S.idx=0; save(); render(); break;
     case 'restart': S=fresh(); save(); render(); break;
-    case 'maxq': S.maxQ=+v; save(); document.getElementById('board').innerHTML=board(); document.getElementById('paylabel').textContent=payLabel(); document.querySelectorAll('[data-act="maxq"]').forEach(x=>x.setAttribute('aria-pressed', String(+x.dataset.v===S.maxQ))); break;
+    case 'maxq': S.maxQ=+v; save(); document.getElementById('board').innerHTML=board(); refreshFilters(); document.querySelectorAll('[data-act="maxq"]').forEach(x=>x.setAttribute('aria-pressed', String(+x.dataset.v===S.maxQ))); break;
     case 'view': S.view=v; save(); document.getElementById('board').innerHTML=board(); document.querySelectorAll('[data-act="view"]').forEach(x=>x.setAttribute('aria-pressed', String(x.dataset.v===v))); break;
     case 'show-c': S.showC=true; document.getElementById('board').innerHTML=board(); break;
     case 'show-d': S.showD=true; document.getElementById('board').innerHTML=board(); break;
@@ -1013,8 +1037,9 @@ function boot(){
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(S.phase==='settings') render(); });
   if(S.phase==='quick' || S.phase==='refine' || S.phase==='friend'){ /* resume mid-flow */ }
   document.addEventListener('click', e=>{ const b=e.target.closest('[data-act="resume"]'); if(b){ S.phase=S.resumePhase||'quick'; save(); render(); return; } _onClick(e); });
-  document.addEventListener('input', e=>{ if(e.target.id==='minpay'){ S.minPay=+e.target.value; document.getElementById('board').innerHTML=board(); document.getElementById('paylabel').textContent=payLabel(); } });
-  document.addEventListener('change', e=>{ if(e.target.id==='minpay') save();
+  document.addEventListener('input', e=>{ if(e.target.id==='minpay'){ S.minPay=+e.target.value; document.getElementById('board').innerHTML=board(); refreshFilters(); } });
+  document.addEventListener('toggle', e=>{ if(e.target.id==='filters'){ S.filtersOpen=e.target.open; save(); } }, true);
+document.addEventListener('change', e=>{ if(e.target.id==='minpay') save();
     if(e.target.id==='fb-include'){ grabFb(); save(); const pre=document.getElementById('fb-preview'); if(pre) pre.textContent=JSON.stringify(buildFeedback(),null,1); } });
   document.addEventListener('input', e=>{ if(e.target.id==='fb-comment'){ grabFb(); const pre=document.getElementById('fb-preview'); if(pre) pre.textContent=JSON.stringify(buildFeedback(),null,1); } });
   window.addEventListener('online', flushQueue); setTimeout(flushQueue, 2000);

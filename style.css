@@ -375,3 +375,16 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 
 /* A job that clashes with a strongest answer */
 .clash{margin:0;font-size:14px;color:var(--brg-accent)}
+
+/* Job details: one row per part of the match, with a plain reason */
+.fits{display:grid;gap:12px;margin-top:6px}
+.fitrow{display:grid;grid-template-columns:7.5em minmax(0,1fr) auto;gap:4px 10px;align-items:center}
+.fitrow .fl{font-weight:600}
+.fitrow .fw{font:500 13px var(--brg-font-mono);justify-self:end}
+.fitrow .fr{grid-column:1/-1;margin:0;font-size:14px;color:var(--brg-ink-3)}
+.fitrow > .muted.fw{grid-column:2/-1;justify-self:start}
+/* Results filters folded into one panel */
+.filters{border:1px solid var(--brg-line-strong);border-radius:var(--brg-radius);padding:10px 14px;margin:12px 0}
+.filters>summary{cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.filters>summary #filtersum{font-size:14px;color:var(--brg-ink-2)}
+.filters[open]>summary{margin-bottom:8px}

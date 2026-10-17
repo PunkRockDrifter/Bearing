@@ -172,7 +172,7 @@ const ONET = {
   "Tutor": {"soc":"25-3041.00","fit":"good","ri":[2.28,2.85,3.07,6.75,1.74,3.35],"z":3,"v":[5.33,5.67,3.33,6.0,2.33,4.17],"c":[1.9,-0.4,-1.4,0.8,-1.5,0.3,-1.6],"wfh":1},
   "Driving Instructor": {"soc":"25-3021.00","fit":"close","ri":[2.51,2.97,4.18,7.0,3.2,3.08],"z":3,"v":[4.67,5.67,4.33,6.0,3.0,4.0],"c":[0.9,0.0,-0.2,1.4,-1.9,0.3,-0.3],"wfh":1},
   "University Lecturer": {"soc":"25-10xx","fit":"close","ri":[3.24,5.55,3.38,6.48,2.49,3.55],"z":5,"v":[5.71,5.62,5.33,4.88,3.1,5.46],"c":[1.32,-0.34,-0.69,1.6,-0.9,0.85,-0.67],"wfh":1.0},
-  "Australian Defence Force Member": {"soc":null,"fit":"rater","ri":[6,5,2,5,6,5],"z":2,"v":[7,4,7,6,3,3],"c":[1,1,1,-2,2,0,1.5],"wfh":0,"src":"Rated by an experienced rater (10 years working with the ADF), as a general average across roles; not O*NET data"},
+  "Australian Defence Force Member": {"soc":null,"fit":"rater","ri":[6,5,2,5,6,5],"z":2,"v":[7,4,7,6,3,3],"c":[1.5,1.5,1.5,-2,2,0,1.5],"wfh":0,"src":"Rated by an experienced rater (10 years working with the ADF), as a general average across roles; not O*NET data"},
   "Corrections Officer": {"soc":"33-3012.00","fit":"good","ri":[5.33,1.69,1.05,3.86,3.16,4.81],"z":2,"v":[4.0,4.67,3.0,5.33,6.0,3.5],"c":[-1.7,1.0,0.8,0.1,1.4,1.4,0.2],"wfh":0},
   "Border Force Officer": {"soc":"33-3051.04","fit":"good","ri":[3.39,2.64,1.0,2.6,4.29,5.27],"z":3,"v":[3.33,4.0,3.33,3.67,5.67,5.17],"c":[-1.6,1.3,1.4,-0.1,0.9,1.2,0.2],"wfh":0},
   "Paralegal": {"soc":"23-2011.00","fit":"good","ri":[1.74,5.04,2.24,3.12,3.92,5.28],"z":3,"v":[4.0,3.0,3.67,5.0,4.33,4.33],"c":[-1.2,0.2,-0.9,0.3,0.6,-0.7,-1.9],"wfh":1},
