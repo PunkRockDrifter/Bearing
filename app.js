@@ -269,6 +269,17 @@ function directionOf(P){
   if(P.bearing.strength<0.06) return { top, key:'ALL', n:'The All-Rounder', d:'Your answers pulled evenly in every direction. You could be content in many kinds of work, so the conditions you want from a day matter more than the field.' };
   return { top, key, ...DIRECTIONS[key] };
 }
+/* Plain-language reading of the compass angle: which two types on the dial it sits between. */
+function bearingWords(P, D){
+  const deg=P.bearing.deg, byDeg=ORDER.slice().sort((a,b)=>TYPES[a].deg-TYPES[b].deg);
+  const lo=byDeg[Math.floor(deg/60)%6], hi=byDeg[(Math.floor(deg/60)+1)%6];
+  const off=deg-TYPES[lo].deg, near = off<=30 ? lo : hi;
+  const where = (off<=8 || off>=52) ? `points almost straight at ${TYPES[near].name}` : `points between ${TYPES[lo].name} and ${TYPES[hi].name}, closer to ${TYPES[near].name}`;
+  const gap = Math.abs(((TYPES[D.top[0]].deg-TYPES[D.top[1]].deg)+540)%360-180);
+  return gap<=60 ? `· your needle ${where}.`
+    : `· your two strongest types sit on different sides of the compass, so they partly cancel out and the needle ${where}.`;
+}
+const levelWord = r => r>=0.85 ? 'Strong' : r>=0.55 ? 'Moderate' : r>=0.3 ? 'Some' : 'Low';
 const leanLabel = s => s>=0.3 ? 'Clear lean' : s>=0.15 ? 'Moderate lean' : 'All-rounder';
 
 /* ---------- rendering ---------- */
@@ -720,12 +731,12 @@ function results(){
   <section class="res-head">
     <div>${compassSVG(P)}</div>
     <div class="dir"><span class="eyebrow">${name} bearing</span>
-      <div class="bearing-num">${D.key==='ALL' ? '—' : String(P.bearing.deg).padStart(3,'0')+'°'}</div>
       <h1 class="dir-name">${D.n}</h1>
+      ${D.key==='ALL' ? '' : `<p class="bearing-line"><b>${String(P.bearing.deg).padStart(3,'0')}°</b> ${bearingWords(P, D)}</p>`}
       <span class="lean">${leanLabel(P.bearing.strength)} · ${TYPES[D.top[0]].name} + ${TYPES[D.top[1]].name}</span>
       <p>${D.d}</p>
       ${P.bearing.strength<0.15 && D.key!=='ALL' ? `<p class="muted">Your answers spread fairly evenly across all six directions. That usually means you’d be happy in more kinds of work than most people, and that the conditions below matter more than the field.</p>` : ''}
-      <div class="mix">${D.top.map((t,i)=>`<div class="mixrow ${i<2?'top':''}"><span>${TYPES[t].name}</span><div class="bar"><i style="width:${(100*P.rel[t]/P.rel[D.top[0]]).toFixed(0)}%"></i></div><span>${Math.round(P.rel[t]*100)}%</span></div>`).join('')}</div>
+      <div class="mix">${D.top.map((t,i)=>`<div class="mixrow ${i<2?'top':''}"><span>${TYPES[t].name}</span><div class="bar"><i style="width:${Math.max(4,100*P.rel[t]/P.rel[D.top[0]]).toFixed(0)}%"></i></div><span>${levelWord(P.rel[t]/P.rel[D.top[0]])}</span></div>`).join('')}</div>
     </div>
   </section>
   <section class="section grid2">

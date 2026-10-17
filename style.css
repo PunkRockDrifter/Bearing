@@ -357,3 +357,7 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .optstrip .eyebrow{margin-right:4px}
 /* Job details open in place, full width under the tapped job */
 .chips>.detail{flex-basis:100%;width:100%}
+
+/* Results heading: the title leads, the compass number sits underneath with a plain explanation */
+.bearing-line{margin:6px 0 10px;font-size:16px;color:var(--brg-ink-2);line-height:1.45}
+.bearing-line b{font-family:var(--brg-font-mono);color:var(--brg-accent);font-weight:600;font-size:18px}
