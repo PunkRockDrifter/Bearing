@@ -3,7 +3,7 @@
    O*NET 30.2 Database (February 2026): work values (1-7), last published there, dated 2008-2020.
    U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under CC BY 4.0.
    Bearing matched and blended these occupations; USDOL/ETA has not approved, endorsed or tested these changes.
-   soc = O*NET-SOC code (or blend); fit = good | close | loose | none; ri = [R,I,A,S,E,C];
+   soc = O*NET-SOC code (or blend); fit = good | close | loose | rater (no O*NET data; rated by an experienced rater, see src); ri = [R,I,A,S,E,C];
    z = job zone; v = work values [achievement, independence, recognition, relationships, support, working conditions];
    vsrc = values borrowed from the most closely related occupation that has them. */
 const ONET = {
@@ -169,7 +169,7 @@ const ONET = {
   "Tutor": {"soc":"25-3041.00","fit":"good","ri":[2.28,2.85,3.07,6.75,1.74,3.35],"z":3,"v":[5.33,5.67,3.33,6.0,2.33,4.17]},
   "Driving Instructor": {"soc":"25-3021.00","fit":"close","ri":[2.51,2.97,4.18,7.0,3.2,3.08],"z":3,"v":[4.67,5.67,4.33,6.0,3.0,4.0]},
   "University Lecturer": {"soc":"25-10xx","fit":"close","ri":[3.24,5.55,3.38,6.48,2.49,3.55],"z":5,"v":[5.71,5.62,5.33,4.88,3.1,5.46]},
-  "Australian Defence Force Member": {"soc":null,"fit":"none"},
+  "Australian Defence Force Member": {"soc":null,"fit":"rater","ri":[6,5,2,5,6,5],"z":2,"v":[7,4,7,6,3,3],"src":"Rated by an experienced rater (10 years working with the ADF), as a general average across roles; not O*NET data"},
   "Corrections Officer": {"soc":"33-3012.00","fit":"good","ri":[5.33,1.69,1.05,3.86,3.16,4.81],"z":2,"v":[4.0,4.67,3.0,5.33,6.0,3.5]},
   "Border Force Officer": {"soc":"33-3051.04","fit":"good","ri":[3.39,2.64,1.0,2.6,4.29,5.27],"z":3,"v":[3.33,4.0,3.33,3.67,5.67,5.17]},
   "Paralegal": {"soc":"23-2011.00","fit":"good","ri":[1.74,5.04,2.24,3.12,3.92,5.28],"z":3,"v":[4.0,3.0,3.67,5.0,4.33,4.33]},
