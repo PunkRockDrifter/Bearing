@@ -215,7 +215,8 @@ function congruence(top, code){ let n=0,d=0; code.split('').forEach((t,i)=>{ con
 function scoreJobs(P, st){
   const topTypes = ORDER.slice().sort((a,b)=>P.rel[b]-P.rel[a]);
   const out = JOBS.map(j=>{
-    const r = 0.6*((pearson(P.rel, j.ri || jobVec(j.code))+1)/2) + 0.4*congruence(topTypes, j.code);
+    // Interests: profile correlation with O*NET (the main measure), plus a little hexagon congruence.
+    const r = 0.8*((pearson(P.rel, j.ri || jobVec(j.code))+1)/2) + 0.2*congruence(topTypes, j.code);
     let cw=0, cd=0; COND_KEYS.forEach((k,i)=>{ const c=P.cond[k]; if(c===null||c===undefined) return; const w=0.5+Math.abs(c)/2; cw+=w; cd+=w*Math.abs(c-j.c[i]); });
     const wf = S.wfh==='need' ? 1.5 : S.wfh==='like' ? 0.75 : 0;
     if(wf && j.wfh!==null && j.wfh!==undefined){ cw+=wf; cd+=wf*4*(1-j.wfh); }
@@ -223,9 +224,11 @@ function scoreJobs(P, st){
     const tk = Object.keys(j.tr||{}); let tf=0.5;
     if(tk.length){ let num=0, den=0; tk.forEach(k=>{ const z=P.traits[k]; if(z!==null){ num+=z*j.tr[k]; den+=Math.abs(j.tr[k]); } }); if(den) tf=0.5+0.5*num/den; }
     const vf = valuesFit(j, st);
-    // Provisional weights (not calibrated against outcomes): interests 50, values 20, conditions 20, personality 10.
-    const parts = [[0.5,r],[0.2,vf],[0.2,cf],[0.1,tf]].filter(([,v])=>v!==null);
-    const total = parts.reduce((s,[w,v])=>s+w*v,0) / parts.reduce((s,[w])=>s+w,0);
+    // Interests lead: values, conditions and personality can reorder jobs you'd find interesting, but can't lift
+    // a job your interests point away from. Provisional weights (not calibrated against outcomes).
+    const parts = [[0.4,vf],[0.4,cf],[0.2,tf]].filter(([,v])=>v!==null);
+    const rest = parts.reduce((s,[w,v])=>s+w*v,0) / parts.reduce((s,[w])=>s+w,0);
+    const total = r * (0.5 + 0.5*rest);
     return { j, r, cf, tf, vf, total };
   });
   const tot = out.map(o=>o.total); const m=mean(tot); const sd=Math.sqrt(mean(tot.map(v=>(v-m)**2)))||1;
@@ -664,7 +667,7 @@ async function shareSnapshot(){
 const band = v => v>=0.75 ? 'Strong' : v>=0.55 ? 'Fair' : 'Weak';
 function fitRows(o){
   const j=o.j, P=profile(S), mine=ORDER.slice().sort((a,b)=>P.rel[b]-P.rel[a]).slice(0,2).map(t=>TYPES[t].name);
-  const rows=[['Interests', o.r, `Mostly ${j.code.slice(0,2).split('').map(t=>TYPES[t].name).join(' and ')} work. Your strongest pulls are ${mine.join(' and ')}.`]];
+  const rows=[['Interests', o.r>=0.75?0.75:o.r>=0.62?0.55:0, `Mostly ${j.code.slice(0,2).split('').map(t=>TYPES[t].name).join(' and ')} work. Your strongest pulls are ${mine.join(' and ')}.`]];
   if(o.vf!==null && o.vf!==undefined && j.values){
     const need=WORK_VALUES.find(v=>v.k===S.values[0]), x=j.values[WORK_VALUES.indexOf(need)];
     rows.push(['Values', o.vf, `Offers ${x>=5.5?'a lot of':x>=4?'some':'little'} ${need.n.toLowerCase()}, your top need.`]);
