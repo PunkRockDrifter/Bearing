@@ -92,7 +92,7 @@ function buildFeedback(){
       refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
-      history_used: !!S.useHistory, friends_added:(S.friends||[]).length,
+      history_used: !!S.useHistory && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length,
       filters:{ min_pay:S.minPay||0, max_training:S.maxQ??4 },
       tiers:{ S:sc.filter(o=>o.tier==='S').map(o=>o.j.t), A:sc.filter(o=>o.tier==='A').map(o=>o.j.t), B:sc.filter(o=>o.tier==='B').map(o=>o.j.t) }
     };
@@ -123,7 +123,7 @@ const secsOf = list => list.reduce((a,x)=>a+(SECS[x.type]??10),0);
 const minsOf = list => Math.max(1, Math.round(secsOf(list)/60));
 function chunk(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
 function quickScreens(){
-  const s=[{type:'interlude', part:1, title:'Stories', text:'Six questions about the things you’re drawn to. There are no wrong answers and nothing here is about jobs. They don’t change your matches; they get you thinking, and they come back with your results.'}];
+  const s=[{type:'interlude', part:1, title:'Stories', text:'Six questions about the things you’re drawn to. There are no wrong answers and nothing here is about jobs. They nudge your matches a little and come back with your results.'}];
   STORIES.forEach(it=>s.push({type:'story', item:it, part:1}));
   s.push({type:'interlude', part:2, title:'Activities', text:'Thirty work activities. Rate how much you’d enjoy doing each one. Don’t think about pay, training or whether you could do it yet.'});
   chunk(MINI_IP,5).forEach(items=>s.push({type:'mip', items, part:2}));
@@ -170,10 +170,19 @@ function valuesFit(j, st){
   const a={}, b={}; ORDER.forEach((t,i)=>{ a[t]=want[i]; b[t]=j.values[i]; });
   return (pearson(a,b)+1)/2;
 }
-function selfRaw(st){
+/* Tested methods only (Settings): interests from the Mini-IP and O*NET alone. Off by default, so Bearing's
+   own, untested additions also count: story answers, hand-set descriptions of jobs O*NET only roughly covers,
+   personality fit and (if switched on) job history. */
+const testedOnly = () => !!(typeof SET!=='undefined' && SET && SET.testedOnly);
+function selfRaw(st, mipOnly){
   const raw={R:0,I:0,A:0,S:0,E:0,C:0};
   MINI_IP.forEach(it=>{ const v=(st.mip||{})[it.id]; if(typeof v==='number') raw[it.k]+=v; });
-  if(st.useHistory) (st.roles||[]).forEach(r=>{ const v=roleVerdict(r); const d={fuel:1.5, skill:-1, again:0.75}[v.k]||0; (r.types||[]).forEach(t=>raw[t]+=d); });
+  if(mipOnly) return raw;
+  if(!testedOnly()){
+    Object.values(st.stories||{}).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=2; });
+    Object.values(st.stories2||{}).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=1; });
+  }
+  if(st.useHistory && !testedOnly()) (st.roles||[]).forEach(r=>{ const v=roleVerdict(r); const d={fuel:1.5, skill:-1, again:0.75}[v.k]||0; (r.types||[]).forEach(t=>raw[t]+=d); });
   return raw;
 }
 function roleVerdict(r){
@@ -197,7 +206,7 @@ function profile(st){
   const selfTraits = traitsFrom(st.ipip, IPIP), traits = {...selfTraits};
   const cond={}; COND_KEYS.forEach(k=>{ const s=st.cond[k]; cond[k] = (s===undefined||s===null) ? null : s; });
   let abs = null;
-  if(hasMip(st)){ const raw=selfRaw({...st, useHistory:false}); abs={}; ORDER.forEach(t=>abs[t]=raw[t]/20); }
+  if(hasMip(st)){ const raw=selfRaw(st, true); abs={}; ORDER.forEach(t=>abs[t]=raw[t]/20); }
   return { self, rel, abs, traits, selfTraits, cond, friends:fr, bearing: bearingOf(rel) };
 }
 function bearingOf(rel){
@@ -216,7 +225,9 @@ function scoreJobs(P, st){
   const topTypes = ORDER.slice().sort((a,b)=>P.rel[b]-P.rel[a]);
   const out = JOBS.map(j=>{
     // Interests: profile correlation with O*NET (the main measure), plus a little hexagon congruence.
-    const r = 0.8*((pearson(P.rel, j.ri || jobVec(j.code))+1)/2) + 0.2*congruence(topTypes, j.code);
+    const ri = (testedOnly() && j.riOnet) || j.ri || jobVec(j.code);
+    const code = j.ri ? ORDER.slice().sort((a,b)=>ri[b]-ri[a]).slice(0,3).join('') : j.code;
+    const r = 0.8*((pearson(P.rel, ri)+1)/2) + 0.2*congruence(topTypes, code);
     let cw=0, cd=0; COND_KEYS.forEach((k,i)=>{ const c=P.cond[k]; if(c===null||c===undefined) return; const w=0.5+Math.abs(c)/2; cw+=w; cd+=w*Math.abs(c-j.c[i]); });
     const wf = S.wfh==='need' ? 1.5 : S.wfh==='like' ? 0.75 : 0;
     if(wf && j.wfh!==null && j.wfh!==undefined){ cw+=wf; cd+=wf*4*(1-j.wfh); }
@@ -226,7 +237,7 @@ function scoreJobs(P, st){
     const vf = valuesFit(j, st);
     // Interests lead: values, conditions and personality can reorder jobs you'd find interesting, but can't lift
     // a job your interests point away from. Provisional weights (not calibrated against outcomes).
-    const parts = [[0.4,vf],[0.4,cf],[0.2,tf]].filter(([,v])=>v!==null);
+    const parts = [[0.4,vf],[0.4,cf],[0.2,testedOnly()?null:tf]].filter(([,v])=>v!==null);
     const rest = parts.reduce((s,[w,v])=>s+w*v,0) / parts.reduce((s,[w])=>s+w,0);
     const total = r * (0.5 + 0.5*rest);
     return { j, r, cf, tf, vf, total };
@@ -393,6 +404,7 @@ function settings(){
         <div class="seg" role="radiogroup" aria-label="Appearance">
           ${[['system','Match phone',ICON_SYS],['light','Light',ICON_SUN],['dark','Dark',ICON_MOON]].map(([v,l,ic])=>`<button role="radio" data-act="set-theme" data-v="${v}" aria-checked="${t===v}">${ic}<span>${l}</span></button>`).join('')}
         </div></div>
+      <div class="set-row"><div><div class="set-name">Tested methods only</div><div class="set-sub">Matches use only the published, tested measures (the O*NET Interest Profiler and O*NET job data). Leaves out your story answers, job history, personality fit and Bearing\u2019s own job descriptions. Off gives a fuller read; on gives the stricter one.</div></div>${sw('set-tested',!!SET.testedOnly,'Tested methods only')}</div>
       <div class="set-row"><div><div class="set-name">AI coach</div><div class="set-sub">Adds a button to your results that packages them into a prompt for any AI chat. Nothing is sent from this app; you choose where to paste it.</div></div>${sw('set-ai',!!SET.ai,'AI coach')}</div>
       ${FEEDBACK_ON ? `<div class="set-row"><div><div class="set-name">Ask me for feedback</div><div class="set-sub">Shows a short “Did this hit the mark?” card on your results. Nothing is sent unless you press Send.${(SET.submissions||[]).length ? ` Feedback you’ve sent: ${SET.submissions.map(x=>`<b class="mono">${esc(x)}</b>`).join(', ')}. To have one deleted, quote its ID using the contact details in the privacy policy.`:''}</div></div>${sw('set-fb',!SET.noFeedback,'Ask me for feedback')}</div>` : ''}
       ${deferredInstall ? `<div class="set-row"><div><div class="set-name">Install the app</div><div class="set-sub">Adds Bearing to your home screen. It works offline.</div></div><button class="btn ghost sm" data-act="install">Install</button></div>` : ''}
@@ -680,7 +692,7 @@ function fitRows(o){
   rows.push(['Conditions', o.cf, cr]);
   rows.push(o.ready ? ['Readiness', [1,0.6,0.25][o.ready.lvl], READY[o.ready.lvl]+'.'+(o.ready.carry.length?` Carries over: ${o.ready.carry.join(', ').toLowerCase()}.`:''), READY[o.ready.lvl]]
                     : ['Readiness', null, 'Answer the optional experience questions to see how close you are.']);
-  rows.push(['Personality', o.tf, 'Plays a small part in the ranking.']);
+  rows.push(testedOnly() ? ['Personality', null, 'Not used: you chose tested methods only.'] : ['Personality', o.tf, 'Plays a small part in the ranking.']);
   return `<div class="fits">${rows.map(([l,v,r,w])=>`<div class="fitrow"><span class="fl">${l}</span>${v===null?'<span class="fw muted">Not assessed</span>':`<div class="bar"><i style="width:${Math.round(Math.max(0.04,Math.min(1,v))*100)}%"></i></div><b class="fw">${w||band(v)}</b>`}<p class="fr">${esc(r)}</p></div>`).join('')}</div>`;
 }
 function jobDetail(o){
@@ -723,7 +735,7 @@ function fieldBoard(scored){
 function storyEcho(){
   const said = STORIES.map(s=>{ const t=S.stories[s.id]; return t && t!=='none' ? s.opts[t] : null; }).filter(Boolean);
   if(!said.length) return '';
-  return `<section class="section"><h2>What you said you’re drawn to</h2><p class="muted" style="margin:4px 0 12px">From the story questions. They don’t change your matches, so hold them up against the jobs below and see what fits.</p><ul class="look">${said.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>`;
+  return `<section class="section"><h2>What you said you’re drawn to</h2><p class="muted" style="margin:4px 0 12px">From the story questions. ${testedOnly()?'You chose tested methods only, so they don’t change your matches. Hold them up against the jobs below and see what fits.':'They nudge your matches a little. Hold them up against the jobs below too.'}</p><ul class="look">${said.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>`;
 }
 function traitRows(P){
   const f = P.friends.length ? P.friends : [];
@@ -803,7 +815,7 @@ function results(){
   ${historySection(P, D)}
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
-    <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${S.useHistory?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
+    <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
     <div class="optstrip" role="group" aria-label="Optional next steps"><span class="eyebrow">Optional</span>
       ${!S.refineDone ? `<button class="chipbtn sm" data-act="jump" data-v="opt-refine">Your own words</button>` : ''}
       <button class="chipbtn sm" data-act="jump" data-v="opt-friend">Ask a friend</button>
@@ -833,7 +845,7 @@ function results(){
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. The story questions are for reflection and don\u2019t change your matches. Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
+    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. ${testedOnly()?'You chose tested methods only, so your story answers, job history and personality don\u2019t change your matches, and every job uses O*NET\u2019s interest data alone.':'Your story answers also nudge your interests, jobs that O*NET only roughly covers also use Bearing\u2019s own description of them, and personality plays a small part. These are Bearing\u2019s own additions and haven\u2019t been tested against official frameworks. To leave them out, turn on Tested methods only in Settings.'} Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;
@@ -976,6 +988,7 @@ async function onClick(e){
     case 'fb-never': SET.noFeedback=true; saveSet(); refreshFb(); toast('Got it. You can turn this back on in Settings.'); break;
     case 'set-fb': SET.noFeedback=!SET.noFeedback; saveSet(); render(); break;
     case 'set-theme': SET.theme=v; saveSet(); applyTheme(); render(); break;
+    case 'set-tested': SET.testedOnly=!SET.testedOnly; saveSet(); render(); toast(SET.testedOnly?'Tested methods only':'Fuller read: untested extras included'); break;
     case 'set-ai': SET.ai=!SET.ai; saveSet(); render(); toast(SET.ai?'AI coach turned on':'AI coach turned off'); break;
     case 'delete-ask': S._confirmDelete=true; render(); break;
     case 'delete-cancel': S._confirmDelete=false; render(); break;
