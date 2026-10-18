@@ -388,3 +388,7 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .filters>summary{cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .filters>summary #filtersum{font-size:14px;color:var(--brg-ink-2)}
 .filters[open]>summary{margin-bottom:8px}
+
+/* Also count: one switch per extra source, with its edit link */
+.alsorow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.panel.flash{outline:2px solid var(--brg-accent);outline-offset:3px;transition:outline-color .4s}

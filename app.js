@@ -37,7 +37,7 @@ function decode(code){
 
 /* ---------- state ---------- */
 function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, mip:{}, ipip:{}, values:[], wfh:null, cond:{},
-  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, hobbies:[], useHobbies:true, filtersOpen:true, minPay:0 }; }
+  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, hobbies:[], useHobbies:true, useFriends:true, filtersOpen:true, minPay:0 }; }
 function freshF(){ return { for:'', by:'', ipip:{}, text:'' }; }
 let S = fresh(), F = null;
 const HOSTED = typeof window!=='undefined' && window.BEARING_HOSTED===true;
@@ -92,7 +92,7 @@ function buildFeedback(){
       refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
-      history_used: !!S.useHistory && !testedOnly(), hobbies:(S.hobbies||[]).map(h=>({ types:h.types, love:h.love })), hobbies_used: S.useHobbies!==false && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length,
+      history_used: !!S.useHistory && !testedOnly(), hobbies:(S.hobbies||[]).map(h=>({ types:h.types, love:h.love })), hobbies_used: S.useHobbies!==false && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length, friends_used: S.useFriends!==false && !testedOnly(),
       filters:{ min_pay:S.minPay||0, max_training:S.maxQ??4 },
       tiers:{ S:sc.filter(o=>o.tier==='S').map(o=>o.j.t), A:sc.filter(o=>o.tier==='A').map(o=>o.j.t), B:sc.filter(o=>o.tier==='B').map(o=>o.j.t) }
     };
@@ -141,8 +141,9 @@ function quickScreens(){
 function refineScreens(){
   const s=[{type:'interlude', part:1, title:'In your own words', text:'', refine:true}];
   DEEP.forEach(it=>s.push({type:'deep', item:it, part:1}));
+  if(SET.ai && STORIES.some(q=>S.stories[q.id] && S.stories[q.id]!=='none')) s.push({type:'swords', part:1});
   s.push({type:'drain', part:2});
-  s[0].text = `Three questions to answer in your own words, and one about what wears you out. They don’t change your matches. They give you, and the AI coach, more to work with. About ${minsOf(s)} minutes.`;
+  s[0].text = `${s.length>5?'A few questions':'Three questions'} to answer in your own words, and one about what wears you out. They don’t change your matches. They give you, and the AI coach, more to work with. About ${minsOf(s)} minutes.`;
   return s;
 }
 function friendScreens(){
@@ -152,7 +153,7 @@ function friendScreens(){
   s.push({type:'ftext'}); s.push({type:'fdone'});
   return s;
 }
-function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): S.phase==='hobbyedit'?[{type:'hobbies'}]: []; }
+function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): S.phase==='hobbyedit'?[{type:'hobbies'}]: S.phase==='roleedit'?[{type:'roles'}]: []; }
 const PART_NAMES = { quick:['Stories','Activities','How you run','What you need','Experience'], refine:['In your words','What drains you'] };
 
 /* ---------- scoring ---------- */
@@ -203,9 +204,12 @@ function profile(st){
   const self = relFrom(selfRaw(st));
   const fr = (st.friends||[]).map(f=>({ name:f.data.by||'A friend', rel: null,
     traits: traitsFrom(f.data.ipip||{}, IPIP.filter(i=>i.f && i.k!=='st')), text:f.data.text||'' }));
-  // Friends' answers are shown beside yours for comparison; they don't change your scores or matches.
   const rel = {...self};
   const selfTraits = traitsFrom(st.ipip, IPIP), traits = {...selfTraits};
+  // Friends' ratings: shown beside yours, and (unless switched off) averaged with yours for the traits others
+  // can see, which only touches the small personality part of the ranking.
+  if(fr.length && st.useFriends!==false && !testedOnly()) TRAIT_ORDER.forEach(k=>{ const fz=fr.map(f=>f.traits[k]).filter(v=>v!==null&&v!==undefined);
+    if(fz.length && traits[k]!==null) traits[k]=(traits[k]+mean(fz))/2; });
   const cond={}; COND_KEYS.forEach(k=>{ const s=st.cond[k]; cond[k] = (s===undefined||s===null) ? null : s; });
   let abs = null;
   if(hasMip(st)){ const raw=selfRaw(st, true); abs={}; ORDER.forEach(t=>abs[t]=raw[t]/20); }
@@ -490,7 +494,7 @@ function progressBar(list){
   const sc = list[S.idx]; const total = list.length; const pct = Math.round(100*S.idx/Math.max(1,total-1));
   let label='', left='';
   if(S.phase==='friend'){ label=`Describing ${esc(nm())}`; left=`${Math.max(0,total-1-S.idx)} to go`; }
-  else if(S.phase==='hobbyedit'){ label='Hobbies and side projects'; left='optional'; }
+  else if(S.phase==='hobbyedit'||S.phase==='roleedit'){ label=S.phase==='hobbyedit'?'Hobbies and side projects':'Past roles'; left='optional'; }
   else { const names=PART_NAMES[S.phase]; label=`Part ${sc.part} of ${names.length} · ${names[sc.part-1]}`;
     const remaining = secsOf(list.slice(S.idx));
     left = remaining>75 ? `about ${Math.round(remaining/60)} min left` : 'almost done'; }
@@ -547,16 +551,16 @@ function question(){
           <div class="eyebrow" style="margin-top:6px">Highest qualification</div><div class="chips">${QUALS.map((q,i)=>`<button class="chipbtn" data-act="qual" data-v="${i}" aria-pressed="${S.exp.q===i}">${q}</button>`).join('')}</div></div>
         <div class="nav">${back}<div class="cta-row"><button class="btn ghost" data-act="skip-exp">Skip</button><button class="btn" data-act="next" ${S.exp.q===null?'disabled':''}>Next</button></div></div>`; break; }
     case 'roles': {
-      const roles = S.roles.length ? S.roles : [];
-      body = `<section class="interlude" style="padding-top:20px"><span class="num">PART 05 \u00b7 OPTIONAL</span><h2>Past roles</h2>
-        <p class="hint" style="font-size:17px">Up to three jobs or big roles you\u2019ve had, paid or not. These won\u2019t change your ranking unless you choose that on the results page.</p></section>
+      const roles = S.roles.length ? S.roles : [], solo = S.phase==='roleedit';
+      body = `<section class="interlude" style="padding-top:20px"><span class="num">${solo?'OPTIONAL':'PART 05 \u00b7 OPTIONAL'}</span><h2>Past roles</h2>
+        <p class="hint" style="font-size:17px">Up to three jobs or big roles you\u2019ve had, paid or not. These won\u2019t change your ranking unless you switch them on in the results filters.</p></section>
         ${roles.map((r,i)=>`<div class="panel role"><div class="cta-row" style="justify-content:space-between"><label class="eyebrow" for="role-${i}">Role ${i+1}</label><button class="linkbtn" data-act="role-del" data-v="${i}">Remove</button></div>
           <input id="role-${i}" type="text" value="${esc(r.t)}" placeholder="e.g. Warehouse supervisor, school canteen volunteer">
           <div class="eyebrow">What did it mostly involve? Pick up to two.</div><div class="chips">${ORDER.map(t=>`<button class="chipbtn" data-act="role-type" data-id="${i}" data-v="${t}" aria-pressed="${r.types.includes(t)}">${DEEP_TAGS[t]}</button>`).join('')}</div>
           <div class="grid2" style="gap:12px"><div><div class="eyebrow">Were you good at it?</div><div class="chips" style="margin-top:6px">${GOOD.map((g,k)=>`<button class="chipbtn" data-act="role-good" data-id="${i}" data-v="${k}" aria-pressed="${r.good===k}">${g}</button>`).join('')}</div></div>
             <div><div class="eyebrow">Did you enjoy it?</div><div class="chips" style="margin-top:6px">${ENJOY.map((g,k)=>`<button class="chipbtn" data-act="role-enjoy" data-id="${i}" data-v="${k}" aria-pressed="${r.enjoy===k}">${g}</button>`).join('')}</div></div></div></div>`).join('')}
         ${roles.length<3 ? `<button class="btn ghost" data-act="role-add" style="width:fit-content">+ Add a role</button>` : ''}
-        <div class="nav">${back}<button class="btn" data-act="next">Next</button></div>`; break; }
+        <div class="nav">${solo?'<span></span>':back}<button class="btn" data-act="${solo?'role-done':'next'}">${solo?'Back to my results':'Next'}</button></div>`; break; }
     case 'hobbies': {
       const hb = S.hobbies||[], solo = S.phase==='hobbyedit';
       body = `<section class="interlude" style="padding-top:20px"><span class="num">${solo?'OPTIONAL':'PART 05 \u00b7 OPTIONAL'}</span><h2>Hobbies and side projects</h2>
@@ -572,6 +576,12 @@ function question(){
       body = `<section class="screen"><div class="q">${esc(it.q)}</div>${SET.ai ? `<textarea id="dp-${it.id}" placeholder="Optional, for the AI coach. A few sentences is plenty.">${esc(d.text)}</textarea>` : ''}
         <div class="eyebrow">${esc(it.tagq)}</div><div class="chips">${shuffle(ORDER,it.id).map(t=>`<button class="chipbtn" data-act="tag" data-id="${it.id}" data-v="${t}" aria-pressed="${d.tags.includes(t)}">${DEEP_TAGS[t]}</button>`).join('')}</div></section>
         <div class="nav">${back}<button class="btn" data-act="next" ${d.tags.length?'':'disabled'}>Next</button></div>`; break; }
+    case 'swords': {
+      const answered = STORIES.filter(q=>S.stories[q.id] && S.stories[q.id]!=='none');
+      body = `<section class="screen"><div class="q">Your story answers, in your own words</div><p class="hint">Optional, for the AI coach. A sentence on any of these makes its read much sharper.</p>
+        ${answered.map(q=>`<div class="scale-item"><div class="muted" style="font-size:15px">${esc(q.q)}</div><div><b>${esc(q.opts[S.stories[q.id]])}</b></div>
+          <textarea id="st-${q.id}" placeholder="Who or what was it, and why did it stick with you?">${esc(S.storyText[q.id]||'')}</textarea></div>`).join('')}</section>
+        <div class="nav">${back}<button class="btn" data-act="next">Next</button></div>`; break; }
     case 'drain': {
       const cur=S.refine.drain;
       body = `<section class="screen"><div class="q">Which two would wear you out fastest, even if you were good at them?</div><div class="opts">${shuffle(ORDER,'drain').map(t=>`<button class="opt" data-act="drain" data-v="${t}" aria-pressed="${cur.includes(t)}">${DRAIN[t]}</button>`).join('')}</div></section>
@@ -784,30 +794,32 @@ function board(){
   return S.view==='fields' ? fieldBoard(list) : tierBoard(list);
 }
 function rankSwitches(){
-  const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length);
-  if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies and job history are off because Tested methods only is on in Settings.</span></div>`;
+  const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length), fr=S.friends||[];
+  if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies, job history and friends’ ratings are off because Tested methods only is on in Settings.</span></div>`;
+  const row = (on, act, label, editAct, editLabel, addLabel) => `<div class="alsorow">${on===null
+      ? `<button class="chipbtn sm" data-act="${editAct}">${addLabel}</button>`
+      : `<button class="toggle-sw" data-act="${act}" aria-pressed="${on}"><span></span>${label}</button><button class="linkbtn" data-act="${editAct}">${editLabel}</button>`}</div>`;
   return `<div class="frow"><span class="eyebrow">Also count</span>
-    ${hb.length ? `<button class="toggle-sw" data-act="hobbies-use" aria-pressed="${S.useHobbies!==false}"><span></span>My hobbies (${hb.map(h=>esc(h.t||'unnamed')).join(', ')})</button>` : ''}
-    <button class="chipbtn sm" data-act="hobby-edit" style="width:fit-content">${hb.length?'Edit hobbies':'+ Add hobbies'}</button>
-    ${roles.length ? `<button class="toggle-sw" data-act="history" aria-pressed="${!!S.useHistory}"><span></span>My job history</button>` : ''}</div>`;
+    ${row(hb.length?S.useHobbies!==false:null, 'hobbies-use', `My hobbies (${hb.map(h=>esc(h.t||'unnamed')).join(', ')})`, 'hobby-edit', 'Edit', '+ Add hobbies')}
+    ${row(roles.length?!!S.useHistory:null, 'history', `My job history (${roles.length} role${roles.length>1?'s':''})`, 'role-edit', 'Edit', '+ Add job history')}
+    ${row(fr.length?S.useFriends!==false:null, 'friends-use', `Friends’ ratings (${fr.map(f=>esc(f.data.by||'a friend')).join(', ')})`, 'friend-jump', 'Ask another', '+ Ask a friend to rate you')}</div>`;
 }
 function historySection(P, D){
   const roles=(S.roles||[]).filter(r=>r.t || r.types.length);
   if(!roles.length) return '';
   return `<section class="section"><h2>What your history says</h2>
-    <p class="muted" style="margin:0">Your past roles, checked against your direction. By default they don\u2019t change your ranking, so the results above are a fresh read.</p>
+    <p class="muted" style="margin:0">Your past roles, checked against your direction. </p>
     <div class="actions">${roles.map(r=>{ const v=roleVerdict(r); const inDir = r.types.some(t=>t===D.top[0]||t===D.top[1]);
       return `<div class="panel"><div class="eyebrow">${esc(v.label)}</div><h3>${esc(r.t||'Unnamed role')}</h3>
         ${r.types.length?`<p class="muted">Mostly ${r.types.map(t=>TYPES[t].name).join(' and ')} work. ${inDir?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}
         ${v.text?`<p>${esc(v.text)}</p>`:''}</div>`; }).join('')}</div>
-    <div class="cta-row"><button class="toggle-sw" data-act="history" aria-pressed="${!!S.useHistory}"><span></span>Let my history adjust the ranking</button>
-      <span class="muted" style="font-size:14px">${S.useHistory?'On: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Off: the ranking ignores your history.'}</span></div></section>`;
+    <p class="muted" style="font-size:14px">${S.useHistory&&!testedOnly()?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Also count.'}</p></section>`;
 }
 function results(){
   const P = profile(S), D = directionOf(P), scored = scoreJobs(P, S); LAST = scored;
   const name = S.name ? esc(S.name)+'’s' : 'Your';
   const friendsHtml = P.friends.length ? `<section class="section"><h2>How others see you</h2>
-    <p class="muted" style="margin:0">The hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view is there to compare with yours. It doesn’t change your matches.</p>
+    <p class="muted" style="margin:0">The hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view is there to compare with yours. ${S.useFriends!==false&&!testedOnly()?'It’s also averaged into the personality part of your matches, which is a small part. Switch it off in the Filter panel.':'It doesn’t change your matches.'}</p>
     ${P.friends.filter(f=>f.text).map(f=>`<div class="panel"><div class="eyebrow">${esc(f.name)} says you’re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}</section>` : '';
   const sCount = scored.filter(o=>o.tier==='S').length;
 
@@ -837,11 +849,6 @@ function results(){
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
     <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${!testedOnly()&&S.useHobbies!==false&&(S.hobbies||[]).some(h=>h.types.length)?'Your hobbies are adjusting this ranking. ':''}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
-    <div class="optstrip" role="group" aria-label="Optional next steps"><span class="eyebrow">Optional</span>
-      ${!S.refineDone ? `<button class="chipbtn sm" data-act="jump" data-v="opt-refine">Your own words</button>` : ''}
-      <button class="chipbtn sm" data-act="jump" data-v="opt-friend">Ask a friend</button>
-      <button class="chipbtn sm" data-act="jump" data-v="ai-panel">AI coach</button>
-      <button class="chipbtn sm" data-act="jump" data-v="opt-share">Keep or share</button></div>
     <details class="filters" id="filters" ${S.filtersOpen!==false?'open':''}><summary><span class="eyebrow">Filter</span> <span id="filtersum"></span></summary>
     <div class="payfilter"><div class="frow"><label for="minpay" class="eyebrow">Minimum pay</label><input type="range" id="minpay" min="0" max="160" step="10" value="${S.minPay||0}"><span id="paylabel" class="paylabel"></span></div>
       <div class="frow"><span class="eyebrow">Most training I\u2019d do</span><div class="chips">${TRAIN_OPTS.map(([v,l])=>`<button class="chipbtn sm" data-act="maxq" data-v="${v}" aria-pressed="${(S.maxQ??4)===v}">${l}</button>`).join('')}</div></div>
@@ -850,7 +857,7 @@ function results(){
     <div id="board">${board()}</div>
   </section>
   <section class="section"><h2>Optional next steps</h2><div class="actions">
-    ${!S.refineDone ? `<div class="panel" id="opt-refine"><h3>In your own words</h3><p>About ${minsOf(refineScreens())} more minutes: three questions in your own words and one about what wears you out. It doesn’t change your matches, but it gives you and the AI coach more to work with.</p><button class="btn" data-act="refine">Start</button></div>` : ''}
+    <div class="panel" id="opt-refine"><h3>In your own words</h3><p>${S.refineDone?'Done. You can change your answers any time.':`About ${minsOf(refineScreens())} more minutes: a few questions in your own words and one about what wears you out.`} It doesn’t change your matches, but it gives you and the AI coach more to work with.</p><button class="btn${S.refineDone?' ghost':''}" data-act="refine">${S.refineDone?'Edit my answers':'Start'}</button></div>
     <div class="panel" id="opt-friend"><h3>Ask a friend</h3>${LINKS
       ? `<p>Send an invite to someone who knows you well. They answer about ${minsOf(friendScreens())} minutes of questions about you, then send their answers back to you.</p>
          <label class="eyebrow" for="reply-in">Your email, so their answers come straight back to you (optional)</label>
@@ -860,14 +867,14 @@ function results(){
       : `<p>Send someone who knows you well the app. They choose “Describe a friend”, answer about you, and send you a code. Paste it here.</p>
       <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}</div>
     <div class="panel" id="ai-panel"><h3>AI coach</h3>${SET.ai
-      ? `<p>Copies your results as a prompt you can paste into any AI chat for a fuller conversation about direction and next steps.</p><div class="cta-row"><button class="btn" data-act="copy-prompt">Copy prompt for an AI coach</button><button class="btn ghost" data-act="ai-words">${Object.values(S.storyText||{}).some(t=>t&&t.trim())?'Edit my words':'Add my own words'}</button></div>`
+      ? `<p>Copies your results as a prompt you can paste into any AI chat for a fuller conversation about direction and next steps.</p><div class="cta-row"><button class="btn" data-act="copy-prompt">Copy prompt for an AI coach</button></div>`
       : `<p>Optional. Turn it on to get a prompt you can paste into any AI chat. Nothing is sent from this app.</p><button class="btn ghost" data-act="settings">Turn on in Settings</button>`}</div>
     <div class="panel" id="opt-share"><h3>Keep or share</h3><p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
       <div class="cta-row"><button class="btn ghost sm" data-act="share-snap">${SHARE_ICON}Share my Bearing</button><button class="btn ghost sm" data-act="copy-profile">Copy code</button></div></div>
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. ${testedOnly()?'You chose tested methods only, so your story answers, hobbies, job history and personality don\u2019t change your matches, and every job uses O*NET\u2019s interest data alone.':'Your story answers and hobbies also nudge your interests, jobs that O*NET only roughly covers also use Bearing\u2019s own description of them, and personality plays a small part. These are Bearing\u2019s own additions and haven\u2019t been tested against official frameworks. To leave them out, turn on Tested methods only in Settings.'} Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
+    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. ${testedOnly()?'You chose tested methods only, so your story answers, hobbies, job history, friends\u2019 ratings and personality don\u2019t change your matches, and every job uses O*NET\u2019s interest data alone.':'Your story answers and hobbies also nudge your interests, jobs that O*NET only roughly covers also use Bearing\u2019s own description of them, and personality (with any friends\u2019 ratings) plays a small part. These are Bearing\u2019s own additions and haven\u2019t been tested against official frameworks. To leave them out, turn on Tested methods only in Settings.'} Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;
@@ -983,6 +990,10 @@ async function onClick(e){
     case 'hobby-del': grabText(); S.hobbies.splice(+v,1); save(); render(); break;
     case 'hobby-type': { grabText(); const h=S.hobbies[+id]; const i=h.types.indexOf(v); if(i>=0) h.types.splice(i,1); else if(h.types.length<2) h.types.push(v); save(); render(); break; }
     case 'hobby-love': grabText(); S.hobbies[+id].love=+v; save(); render(); break;
+    case 'role-edit': S.phase='roleedit'; S.idx=0; save(); render(); break;
+    case 'role-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
+    case 'friends-use': { S.useFriends=S.useFriends===false; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useFriends?'Friends\u2019 ratings now count':'Friends\u2019 ratings shown for comparison only'); break; }
+    case 'friend-jump': { const el=document.getElementById('opt-friend'); if(el){ el.scrollIntoView({behavior:'smooth',block:'start'}); el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); } break; }
     case 'hobby-edit': S.phase='hobbyedit'; S.idx=0; save(); render(); break;
     case 'hobby-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
     case 'hobbies-use': { S.useHobbies=!S.useHobbies; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHobbies?'Hobbies now adjust the ranking':'Ranking ignores your hobbies'); break; }
@@ -1006,7 +1017,7 @@ async function onClick(e){
     case 'copy-profile': { copyText(profileCode(), document.getElementById('fcode-in')); break; }
     case 'settings': grabText(); if(S.phase!=='settings'){ S.backPhase=S.phase; } S.phase='settings'; render(); break;
     case 'settings-back': S._confirmDelete=false; S.phase=S.backPhase||'intro'; render(); break;
-    case 'ai-offer-yes': SET.ai=true; SET.aiOfferSeen=true; saveSet(); S.phase='words'; save(); render(); break;
+    case 'ai-offer-yes': SET.ai=true; SET.aiOfferSeen=true; saveSet(); S.phase='refine'; S.idx=0; save(); render(); break;
     case 'ai-offer-no': SET.aiOfferSeen=true; saveSet(); { const y=window.scrollY; render(); window.scrollTo(0,y); } toast('No problem. You can turn it on later in Settings.'); break;
     case 'ai-words': S.phase='words'; save(); render(); break;
     case 'words-done': grabText(); S.phase='results'; save(); render(); { const el=document.getElementById('ai-panel'); if(el) el.scrollIntoView({block:'center'}); } toast('Your AI coach prompt is ready'); break;

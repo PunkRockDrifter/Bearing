@@ -1,5 +1,5 @@
 /* Bearing service worker: works offline after the first visit. */
-const CACHE = 'bearing-2026-10-18d';
+const CACHE = 'bearing-2026-10-18e';
 const SHELL = ['./', 'index.html', 'style.css', 'config.js', 'data.js', 'jobs2.js', 'onet.js', 'app.js', 'manifest.webmanifest',
   'privacy.html', 'fonts/fonts.css', 'fonts/instrument-serif-latin-400-normal.woff2', 'fonts/instrument-serif-latin-400-italic.woff2',
   'fonts/public-sans-latin-400-normal.woff2', 'fonts/public-sans-latin-500-normal.woff2', 'fonts/public-sans-latin-600-normal.woff2',
