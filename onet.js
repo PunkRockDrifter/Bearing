@@ -225,5 +225,15 @@ JOBS.forEach(j => {
   if (!o.ri) return;
   j.ri = { R:o.ri[0], I:o.ri[1], A:o.ri[2], S:o.ri[3], E:o.ri[4], C:o.ri[5] };
   j.code0 = j.code;
+  // A close or loose match is a stand-in for the real job, so its interests are blended with the hand-set
+  // code (close: half each; loose: three quarters hand-set). Both are standardised first, then put back
+  // on O*NET's 1-7 scale.
+  const wh = { close: 0.5, loose: 0.75 }[o.fit] || 0;
+  if (wh) {
+    const K = 'RIASEC'.split(''), hand = {}; K.forEach(t => hand[t] = 0); [3, 2, 1].forEach((w, i) => { if (j.code0[i]) hand[j.code0[i]] = w; });
+    const st = v => { const xs = K.map(t => v[t]), m = xs.reduce((a, b) => a + b) / 6, sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / 6) || 1; return { m, sd, z: xs.map(x => (x - m) / sd) }; };
+    const a = st(j.ri), h = st(hand);
+    j.riOnet = j.ri; j.ri = {}; K.forEach((t, i) => j.ri[t] = +(a.m + a.sd * ((1 - wh) * a.z[i] + wh * h.z[i])).toFixed(2));
+  }
   j.code = Object.keys(j.ri).sort((a, b) => j.ri[b] - j.ri[a]).slice(0, 3).join('');
 });
