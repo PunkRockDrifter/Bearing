@@ -37,7 +37,7 @@ function decode(code){
 
 /* ---------- state ---------- */
 function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, mip:{}, ipip:{}, values:[], wfh:null, cond:{},
-  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, minPay:0 }; }
+  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, hobbies:[], useHobbies:true, filtersOpen:true, minPay:0 }; }
 function freshF(){ return { for:'', by:'', ipip:{}, text:'' }; }
 let S = fresh(), F = null;
 const HOSTED = typeof window!=='undefined' && window.BEARING_HOSTED===true;
@@ -92,7 +92,7 @@ function buildFeedback(){
       refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
-      history_used: !!S.useHistory && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length,
+      history_used: !!S.useHistory && !testedOnly(), hobbies:(S.hobbies||[]).map(h=>({ types:h.types, love:h.love })), hobbies_used: S.useHobbies!==false && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length,
       filters:{ min_pay:S.minPay||0, max_training:S.maxQ??4 },
       tiers:{ S:sc.filter(o=>o.tier==='S').map(o=>o.j.t), A:sc.filter(o=>o.tier==='A').map(o=>o.j.t), B:sc.filter(o=>o.tier==='B').map(o=>o.j.t) }
     };
@@ -135,6 +135,7 @@ function quickScreens(){
   s.push({type:'wfh', part:4});
   s.push({type:'exp', part:5});
   s.push({type:'roles', part:5});
+  s.push({type:'hobbies', part:5});
   return s;
 }
 function refineScreens(){
@@ -151,7 +152,7 @@ function friendScreens(){
   s.push({type:'ftext'}); s.push({type:'fdone'});
   return s;
 }
-function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): []; }
+function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): S.phase==='hobbyedit'?[{type:'hobbies'}]: []; }
 const PART_NAMES = { quick:['Stories','Activities','How you run','What you need','Experience'], refine:['In your words','What drains you'] };
 
 /* ---------- scoring ---------- */
@@ -182,6 +183,7 @@ function selfRaw(st, mipOnly){
     Object.values(st.stories||{}).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=2; });
     Object.values(st.stories2||{}).forEach(t=>{ if(raw[t]!==undefined) raw[t]+=1; });
   }
+  if(st.useHobbies!==false && !testedOnly()) (st.hobbies||[]).forEach(h=>{ const d=[0,1,2][h.love]||0; (h.types||[]).forEach(t=>raw[t]+=d); });
   if(st.useHistory && !testedOnly()) (st.roles||[]).forEach(r=>{ const v=roleVerdict(r); const d={fuel:1.5, skill:-1, again:0.75}[v.k]||0; (r.types||[]).forEach(t=>raw[t]+=d); });
   return raw;
 }
@@ -488,6 +490,7 @@ function progressBar(list){
   const sc = list[S.idx]; const total = list.length; const pct = Math.round(100*S.idx/Math.max(1,total-1));
   let label='', left='';
   if(S.phase==='friend'){ label=`Describing ${esc(nm())}`; left=`${Math.max(0,total-1-S.idx)} to go`; }
+  else if(S.phase==='hobbyedit'){ label='Hobbies and side projects'; left='optional'; }
   else { const names=PART_NAMES[S.phase]; label=`Part ${sc.part} of ${names.length} · ${names[sc.part-1]}`;
     const remaining = secsOf(list.slice(S.idx));
     left = remaining>75 ? `about ${Math.round(remaining/60)} min left` : 'almost done'; }
@@ -553,7 +556,17 @@ function question(){
           <div class="grid2" style="gap:12px"><div><div class="eyebrow">Were you good at it?</div><div class="chips" style="margin-top:6px">${GOOD.map((g,k)=>`<button class="chipbtn" data-act="role-good" data-id="${i}" data-v="${k}" aria-pressed="${r.good===k}">${g}</button>`).join('')}</div></div>
             <div><div class="eyebrow">Did you enjoy it?</div><div class="chips" style="margin-top:6px">${ENJOY.map((g,k)=>`<button class="chipbtn" data-act="role-enjoy" data-id="${i}" data-v="${k}" aria-pressed="${r.enjoy===k}">${g}</button>`).join('')}</div></div></div></div>`).join('')}
         ${roles.length<3 ? `<button class="btn ghost" data-act="role-add" style="width:fit-content">+ Add a role</button>` : ''}
-        <div class="nav">${back}<button class="btn" data-act="finish">See my results</button></div>`; break; }
+        <div class="nav">${back}<button class="btn" data-act="next">Next</button></div>`; break; }
+    case 'hobbies': {
+      const hb = S.hobbies||[], solo = S.phase==='hobbyedit';
+      body = `<section class="interlude" style="padding-top:20px"><span class="num">${solo?'OPTIONAL':'PART 05 \u00b7 OPTIONAL'}</span><h2>Hobbies and side projects</h2>
+        <p class="hint" style="font-size:17px">Up to three things you do for the love of it. What you choose to do in your own time says a lot about the work you\u2019d enjoy. You can switch this on or off in the results filters.</p></section>
+        ${hb.map((h,i)=>`<div class="panel role hobby"><div class="cta-row" style="justify-content:space-between"><label class="eyebrow" for="hobby-${i}">Hobby ${i+1}</label><button class="linkbtn" data-act="hobby-del" data-v="${i}">Remove</button></div>
+          <input id="hobby-${i}" type="text" value="${esc(h.t)}" placeholder="e.g. building robots, making music, coding small AI tools">
+          <div class="eyebrow">What does it mostly involve? Pick up to two.</div><div class="chips">${ORDER.map(t=>`<button class="chipbtn" data-act="hobby-type" data-id="${i}" data-v="${t}" aria-pressed="${h.types.includes(t)}">${DEEP_TAGS[t]}</button>`).join('')}</div>
+          <div class="eyebrow">How much do you love it?</div><div class="chips" style="margin-top:6px">${LOVE.map((g,k)=>`<button class="chipbtn" data-act="hobby-love" data-id="${i}" data-v="${k}" aria-pressed="${h.love===k}">${g}</button>`).join('')}</div></div>`).join('')}
+        ${hb.length<3 ? `<button class="btn ghost" data-act="hobby-add" style="width:fit-content">+ Add a hobby</button>` : ''}
+        <div class="nav">${solo?`<span></span>`:back}<button class="btn" data-act="${solo?'hobby-done':'finish'}">${solo?'Back to my results':'See my results'}</button></div>`; break; }
     case 'deep': {
       const it=sc.item; const d=S.refine.deep[it.id]||{text:'',tags:[]};
       body = `<section class="screen"><div class="q">${esc(it.q)}</div>${SET.ai ? `<textarea id="dp-${it.id}" placeholder="Optional, for the AI coach. A few sentences is plenty.">${esc(d.text)}</textarea>` : ''}
@@ -770,6 +783,14 @@ function board(){
   if(!list.length) return `<div class="panel"><p style="margin:0">No jobs match your filters. Lower the minimum pay, allow more training, or show jobs that clash with your strongest answers.</p></div>`;
   return S.view==='fields' ? fieldBoard(list) : tierBoard(list);
 }
+function rankSwitches(){
+  const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length);
+  if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies and job history are off because Tested methods only is on in Settings.</span></div>`;
+  return `<div class="frow"><span class="eyebrow">Also count</span>
+    ${hb.length ? `<button class="toggle-sw" data-act="hobbies-use" aria-pressed="${S.useHobbies!==false}"><span></span>My hobbies (${hb.map(h=>esc(h.t||'unnamed')).join(', ')})</button>` : ''}
+    <button class="chipbtn sm" data-act="hobby-edit" style="width:fit-content">${hb.length?'Edit hobbies':'+ Add hobbies'}</button>
+    ${roles.length ? `<button class="toggle-sw" data-act="history" aria-pressed="${!!S.useHistory}"><span></span>My job history</button>` : ''}</div>`;
+}
 function historySection(P, D){
   const roles=(S.roles||[]).filter(r=>r.t || r.types.length);
   if(!roles.length) return '';
@@ -815,16 +836,17 @@ function results(){
   ${historySection(P, D)}
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
-    <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
+    <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${!testedOnly()&&S.useHobbies!==false&&(S.hobbies||[]).some(h=>h.types.length)?'Your hobbies are adjusting this ranking. ':''}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
     <div class="optstrip" role="group" aria-label="Optional next steps"><span class="eyebrow">Optional</span>
       ${!S.refineDone ? `<button class="chipbtn sm" data-act="jump" data-v="opt-refine">Your own words</button>` : ''}
       <button class="chipbtn sm" data-act="jump" data-v="opt-friend">Ask a friend</button>
       <button class="chipbtn sm" data-act="jump" data-v="ai-panel">AI coach</button>
       <button class="chipbtn sm" data-act="jump" data-v="opt-share">Keep or share</button></div>
-    <details class="filters" id="filters" ${S.filtersOpen?'open':''}><summary><span class="eyebrow">Filter</span> <span id="filtersum"></span></summary>
+    <details class="filters" id="filters" ${S.filtersOpen!==false?'open':''}><summary><span class="eyebrow">Filter</span> <span id="filtersum"></span></summary>
     <div class="payfilter"><div class="frow"><label for="minpay" class="eyebrow">Minimum pay</label><input type="range" id="minpay" min="0" max="160" step="10" value="${S.minPay||0}"><span id="paylabel" class="paylabel"></span></div>
       <div class="frow"><span class="eyebrow">Most training I\u2019d do</span><div class="chips">${TRAIN_OPTS.map(([v,l])=>`<button class="chipbtn sm" data-act="maxq" data-v="${v}" aria-pressed="${(S.maxQ??4)===v}">${l}</button>`).join('')}</div></div>
-      ${LAST.some(o=>clashes(o).length) ? `<div class="frow"><button class="toggle-sw" data-act="hide-clash" aria-pressed="${!!S.hideClash}"><span></span>Hide jobs that clash with my strongest answers</button><span class="muted" style="font-size:14px">${LAST.filter(o=>clashes(o).length).length} jobs clash.</span></div>` : ''}</div></details>
+      ${LAST.some(o=>clashes(o).length) ? `<div class="frow"><button class="toggle-sw" data-act="hide-clash" aria-pressed="${!!S.hideClash}"><span></span>Hide jobs that clash with my strongest answers</button><span class="muted" style="font-size:14px">${LAST.filter(o=>clashes(o).length).length} jobs clash.</span></div>` : ''}
+      ${rankSwitches()}</div></details>
     <div id="board">${board()}</div>
   </section>
   <section class="section"><h2>Optional next steps</h2><div class="actions">
@@ -845,7 +867,7 @@ function results(){
   </div></section>
   ${feedbackCard()}
   <section class="section note">
-    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. ${testedOnly()?'You chose tested methods only, so your story answers, job history and personality don\u2019t change your matches, and every job uses O*NET\u2019s interest data alone.':'Your story answers also nudge your interests, jobs that O*NET only roughly covers also use Bearing\u2019s own description of them, and personality plays a small part. These are Bearing\u2019s own additions and haven\u2019t been tested against official frameworks. To leave them out, turn on Tested methods only in Settings.'} Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
+    <p><b>How this works.</b> Your interests come from the O*NET\u00ae Mini Interest Profiler, 30 activity ratings scored across Holland\u2019s six interest types (RIASEC). Each job\u2019s interest profile comes from the O*NET\u00ae database (version 31.0), matched by hand to Australian jobs. What you need from work uses the six work values of the Theory of Work Adjustment, matched against each job\u2019s O*NET work values (version 30.2, the last release to publish them). Working conditions for each job come from O*NET work-context data, and whether it can be done from home uses Dingel and Neiman\u2019s (2020) rules applied to the same data. \u201cHow you run\u201d uses the Mini-IPIP, public-domain Big Five items from the International Personality Item Pool. ${testedOnly()?'You chose tested methods only, so your story answers, hobbies, job history and personality don\u2019t change your matches, and every job uses O*NET\u2019s interest data alone.':'Your story answers and hobbies also nudge your interests, jobs that O*NET only roughly covers also use Bearing\u2019s own description of them, and personality plays a small part. These are Bearing\u2019s own additions and haven\u2019t been tested against official frameworks. To leave them out, turn on Tested methods only in Settings.'} Scoring is fixed rules, with no AI.</p><p class="muted" style="font-size:13px">This app includes information from the O*NET Career Exploration Tools and the O*NET database by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA), used under the <a href="https://www.onetcenter.org/license_tools.html" target="_blank" rel="noopener">O*NET Tools Developer License</a> and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. O*NET\u00ae is a trademark of USDOL/ETA. Bearing has modified some of this information. USDOL/ETA has not approved, endorsed or tested these modifications.</p>
     <p><b>Pay</b> is an indicative full-time range for Australia and varies a lot by state, experience and award. Check the official figures from Jobs and Skills Australia before deciding anything. Treat this as a map for exploring, not a verdict.</p>
     <p><button class="linkbtn" data-act="restart" style="padding-left:0">Start over with new answers</button></p>
   </section></main>`;
@@ -890,6 +912,8 @@ MY RESULTS`);
   P.friends.forEach(f=>{ const fb=f.rel?bearingOf(f.rel):null; L.push(`\nFriend's view (${f.name}):${f.text?` They say I'm better than I realise at: "${f.text}".`:''}`); });
   const roles=(S.roles||[]).filter(r=>r.t||r.types.length);
   if(roles.length) L.push('\nPast roles (judge these as evidence about what I enjoy and do well, not as a track to stay on):\n'+roles.map(r=>{ const v=roleVerdict(r); return `- ${r.t||'Unnamed role'}: mostly ${r.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'} work; good at it: ${r.good!=null?GOOD[r.good].toLowerCase():'?'}; enjoyed it: ${r.enjoy!=null?ENJOY[r.enjoy].toLowerCase():'?'} (${v.label.toLowerCase()})`; }).join('\n'));
+  const hobbies=(S.hobbies||[]).filter(h=>h.t||h.types.length);
+  if(hobbies.length) L.push('\nHobbies and side projects (what I choose to do for the love of it):\n'+hobbies.map(h=>`- ${h.t||'Unnamed'}: mostly ${h.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'}; ${h.love!=null?LOVE[h.love].toLowerCase():'?'}`).join('\n'));
   if(!S.expSkipped && S.exp.q!==null) L.push(`Qualification: ${QUALS[S.exp.q]}. Skills I've used a lot: ${S.exp.skills.map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase()).join(', ')||'not given'}.`);
   const tierLine = t => sc.filter(o=>o.tier===t).map(o=>o.j.t).join(', ');
   L.push(`\nQuestionnaire job matches (from a fixed list of ${JOBS.length} Australian jobs, so treat as a starting point):\nTop matches: ${tierLine('S')||'none'}\nStrong matches: ${tierLine('A')||'none'}\nGood matches: ${tierLine('B')||'none'}\nRuled out (unlikely), for contrast: ${sc.filter(o=>o.tier==='D').slice(-6).map(o=>o.j.t).join(', ')}`);
@@ -910,6 +934,7 @@ function grabText(){
   STORIES.forEach(s=>{ const el=document.getElementById('st-'+s.id); if(el) S.storyText[s.id]=el.value.slice(0,1000); });
   DEEP.forEach(d=>{ const el=document.getElementById('dp-'+d.id); if(el){ const cur=S.refine.deep[d.id]||{text:'',tags:[]}; cur.text=el.value.slice(0,1500); S.refine.deep[d.id]=cur; } });
   (S.roles||[]).forEach((r,i)=>{ const el=document.getElementById('role-'+i); if(el) r.t=el.value.slice(0,80); });
+  (S.hobbies||[]).forEach((h,i)=>{ const el=document.getElementById('hobby-'+i); if(el) h.t=el.value.slice(0,80); });
   if(F){ const a=document.getElementById('ffor'), b=document.getElementById('fby'), c=document.getElementById('ftx');
     if(a) F.for=a.value.trim().slice(0,40); if(b) F.by=b.value.trim().slice(0,40); if(c) F.text=c.value.slice(0,600); }
 }
@@ -953,6 +978,14 @@ async function onClick(e){
     case 'role-type': { grabText(); const r=S.roles[+id]; const i=r.types.indexOf(v); if(i>=0) r.types.splice(i,1); else if(r.types.length<2) r.types.push(v); save(); render(); break; }
     case 'role-good': grabText(); S.roles[+id].good=+v; save(); render(); break;
     case 'role-enjoy': grabText(); S.roles[+id].enjoy=+v; save(); render(); break;
+    case 'hobby-add': grabText(); S.hobbies=S.hobbies||[]; S.hobbies.push({t:'',types:[],love:null}); save(); render();
+      { const el=document.getElementById('hobby-'+(S.hobbies.length-1)); if(el) el.closest('.hobby').scrollIntoView({behavior:'smooth',block:'start'}); } break;
+    case 'hobby-del': grabText(); S.hobbies.splice(+v,1); save(); render(); break;
+    case 'hobby-type': { grabText(); const h=S.hobbies[+id]; const i=h.types.indexOf(v); if(i>=0) h.types.splice(i,1); else if(h.types.length<2) h.types.push(v); save(); render(); break; }
+    case 'hobby-love': grabText(); S.hobbies[+id].love=+v; save(); render(); break;
+    case 'hobby-edit': S.phase='hobbyedit'; S.idx=0; save(); render(); break;
+    case 'hobby-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
+    case 'hobbies-use': { S.useHobbies=!S.useHobbies; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHobbies?'Hobbies now adjust the ranking':'Ranking ignores your hobbies'); break; }
     case 'history': { S.useHistory=!S.useHistory; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHistory?'History now adjusts the ranking':'Ranking ignores your history'); break; }
     case 'skill': { const i=S.exp.skills.indexOf(v); if(i>=0) S.exp.skills.splice(i,1); else S.exp.skills.push(v); save(); render(); break; }
     case 'qual': S.exp.q=+v; save(); render(); break;
