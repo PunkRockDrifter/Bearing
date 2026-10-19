@@ -373,7 +373,8 @@ function feedbackCard(){
   if(!FEEDBACK_ON || SET.noFeedback) return '';
   const fb=S.fb||{};
   if(fb.sentId) return `<section class="section"><div class="panel"><span class="eyebrow">Feedback</span><h3 style="font-size:24px;text-transform:uppercase">Thanks, that really helps</h3>
-    <p style="margin:0;font-size:15px">Your submission ID is <b style="font-family:var(--mono)">${esc(fb.sentId)}</b>. It\u2019s saved in Settings, so you can ask for it to be deleted later.</p></div></section>`;
+    <p style="margin:0;font-size:15px">Your submission ID is <b style="font-family:var(--mono)">${esc(fb.sentId)}</b>. It\u2019s saved in Settings, so you can ask for it to be deleted later.</p>
+    <div><button class="btn ghost sm" data-act="fb-again">Send more feedback</button></div></div></section>`;
   const top = LAST.filter(o=>o.tier==='S'||o.tier==='A').map(o=>o.j.t);
   const chips = (key, opts, multi) => opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; const on = multi ? (fb[key]||[]).includes(v) : fb[key]===v;
     return `<button class="chipbtn sm" data-act="fb" data-id="${key}" data-v="${esc(v)}" data-multi="${multi?1:0}" aria-pressed="${on}">${esc(l)}</button>`; }).join('');
@@ -868,7 +869,7 @@ function narrowScreens(){
 function gutPair(){ const r=shortRanked(); if(r.length<2) return null; return r.length>=3 ? { keep:r[0], out:r[1], alt:r[2] } : { keep:r[1], out:r[0], alt:r[0], swap:true }; }
 function shortlistSection(){
   const r=shortRanked(), done=r.filter(t=>narrowScore(t)!==null).length;
-  if(!r.length) return `<section class="section" id="shortlist"><h2>Your shortlist</h2><p class="muted" style="margin:0">Tap any job below, then <b>Add to shortlist</b>. Pick up to ${SHORT_MAX} that catch your eye. Then answer a few quick questions about each to narrow them down to two.</p></section>`;
+  if(!r.length) return `<section class="section" id="shortlist"><h2>Your shortlist</h2><p class="muted" style="margin:0">Tap any job above, then <b>Add to shortlist</b>. Pick up to ${SHORT_MAX} that catch your eye. Then answer a few quick questions about each to narrow them down to two.</p></section>`;
   const g=S.gut, gp=gutPair();
   const gutNote = g && g.ans!==null && g.ans!==undefined ? (g.ans===0 ? `Your gut prefers ${esc(g.alt)} over ${esc(g.out)}. Take that seriously; it\u2019s often the truer answer.` : g.ans===2 ? `Your gut agrees with the top two.` : `Your gut doesn\u2019t mind either way between ${esc(g.out)} and ${esc(g.alt)}.`) : '';
   return `<section class="section" id="shortlist"><h2>Your shortlist</h2>
@@ -881,7 +882,7 @@ function shortlistSection(){
     ${r.length>=2 ? shortAi(done) : ''}</section>`;
 }
 function shortAi(done){
-  return `<div class="panel" id="short-ai"><h3>Take it further with AI</h3>
+  return `<div class="panel" id="short-ai"><div class="headpair"><span class="eyebrow">Take it further with</span><h3>AI coach</h3></div>
     <p>For now, an AI chat gets the most out of your shortlist. Use any one you like, such as ChatGPT, Claude, Gemini or Copilot. Bearing copies a message for you; you can read it first, and nothing is sent from this app. The AI will be asked to:</p>
     <ul class="look"><li>tell you honestly whether your top two make sense, and what you might be missing, including in your lower picks</li>
       <li>name the dull and hard parts of each job that the videos don\u2019t show</li>
@@ -920,6 +921,11 @@ function leaveDialog(href, site){
   document.body.appendChild(el); el.querySelector('[data-leave="go"]').focus();
 }
 function closeLeave(){ document.querySelectorAll('.leave').forEach(x=>x.remove()); }
+/* An optional step: a full panel until it's done, then a small ticked line that opens again on tap. */
+function optPanel(id, title, done, doneWord, inner){
+  if(!done) return `<div class="panel" id="${id}"><h3>${title}</h3>${inner}</div>`;
+  return `<details class="panel optdone" id="${id}"><summary><span class="tick" aria-hidden="true">✓</span><span class="optname">${title}</span><span class="muted">${doneWord}</span></summary><div class="optbody">${inner}</div></details>`;
+}
 function rankSwitches(){
   const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length), fr=S.friends||[];
   if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies, job history and friends’ ratings are off because Tested methods only is on in Settings.</span></div>`;
@@ -973,7 +979,6 @@ function results(){
     <div class="cta-row"><button class="btn" data-act="ai-offer-yes">Turn on and add my words</button><button class="btn ghost" data-act="ai-offer-no">No thanks</button></div></div></section>` : ''}
   ${friendsHtml}
   ${historySection(P, D)}
-  ${shortlistSection()}
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
     <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${!testedOnly()&&S.useHobbies!==false&&(S.hobbies||[]).some(h=>h.types.length)?'Your hobbies are adjusting this ranking. ':''}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
@@ -984,21 +989,22 @@ function results(){
       ${rankSwitches()}</div></details>
     <div id="board">${board()}</div>
   </section>
+  ${shortlistSection()}
   <section class="section"><h2>Optional next steps</h2><div class="actions">
-    <div class="panel" id="opt-refine"><h3>In your own words</h3><p>${S.refineDone?'Done. You can change your answers any time.':`About ${minsOf(refineScreens())} more minutes: a few questions in your own words and one about what wears you out.`} It doesn’t change your matches, but it gives you and the AI coach more to work with.</p><button class="btn${S.refineDone?' ghost':''}" data-act="refine">${S.refineDone?'Edit my answers':'Start'}</button></div>
-    <div class="panel" id="opt-friend"><h3>Ask a friend</h3>${LINKS
+    ${optPanel('opt-refine','In your own words', S.refineDone, 'Answered', `<p>${S.refineDone?'You can change your answers any time.':`About ${minsOf(refineScreens())} more minutes: a few questions in your own words and one about what wears you out.`} It doesn’t change your matches, but it gives you and the AI coach more to work with.</p><button class="btn${S.refineDone?' ghost':''}" data-act="refine">${S.refineDone?'Edit my answers':'Start'}</button>`)}
+    ${optPanel('opt-friend','Ask a friend', (S.friends||[]).length>0, `${(S.friends||[]).length} added`, `${(S.friends||[]).length?`<p class="muted" style="margin:0">Added: ${S.friends.map(f=>esc(f.data.by||'a friend')).join(', ')}. You can ask someone else too.</p>`:''}${LINKS
       ? `<p>Send an invite to someone who knows you well. They answer about ${minsOf(friendScreens())} minutes of questions about you, then send their answers back to you.</p>
          <label class="eyebrow" for="reply-in">Your email, so their answers come straight back to you (optional)</label>
          <input id="reply-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(S.replyEmail||'')}">
          <button class="btn" data-act="share-invite">Send an invite</button>
          <details class="saymore"><summary>Got a code instead?</summary><textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button></details>`
       : `<p>Send someone who knows you well the app. They choose “Describe a friend”, answer about you, and send you a code. Paste it here.</p>
-      <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}</div>
-    <div class="panel" id="ai-panel"><h3>AI coach</h3>${SET.ai
+      <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}`)}
+    ${optPanel('ai-panel','AI coach', !!S.aiCopied, 'Copied', `${SET.ai
       ? `<p>Copies your results as a prompt you can paste into any AI chat for a fuller conversation about direction and next steps.</p><div class="cta-row"><button class="btn" data-act="copy-prompt">Copy prompt for an AI coach</button></div>`
-      : `<p>Optional. Turn it on to get a prompt you can paste into any AI chat. Nothing is sent from this app.</p><button class="btn ghost" data-act="settings">Turn on in Settings</button>`}</div>
-    <div class="panel" id="opt-share"><h3>Keep or share</h3><p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
-      <div class="cta-row"><button class="btn ghost sm" data-act="share-snap">${SHARE_ICON}Share my Bearing</button><button class="btn ghost sm" data-act="copy-profile">Copy code</button></div></div>
+      : `<p>Optional. Turn it on to get a prompt you can paste into any AI chat. Nothing is sent from this app.</p><button class="btn ghost" data-act="settings">Turn on in Settings</button>`}`)}
+    ${optPanel('opt-share','Keep or share', !!S.kept, 'Saved', `<p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
+      <div class="cta-row"><button class="btn ghost sm" data-act="share-snap">${SHARE_ICON}Share my Bearing</button><button class="btn ghost sm" data-act="copy-profile">Copy code</button></div>`)}
   </div></section>
   ${feedbackCard()}
   <section class="section note">
@@ -1127,7 +1133,7 @@ async function onClick(e){
     case 'nans': { const t=screens()[S.idx].t; S.narrow[t]=S.narrow[t]||{}; S.narrow[t][id]=+v; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
     case 'gut': { const gp=gutPair(); S.gut={ out:gp.out, alt:gp.alt, ans:+v }; save(); render(); break; }
     case 'narrow-done': S.phase='results'; save(); render(); { const el=document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); } toast('Shortlist ranked'); break;
-    case 'short-copy': { if(!SET.ai){ SET.ai=true; saveSet(); } copyText(aiPrompt(), null); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
+    case 'short-copy': { if(!SET.ai){ SET.ai=true; saveSet(); } copyText(aiPrompt(), null); S.aiCopied=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
     case 'role-edit': S.phase='roleedit'; S.idx=0; save(); render(); break;
     case 'role-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
     case 'friends-use': { S.useFriends=S.useFriends===false; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useFriends?'Friends\u2019 ratings now count':'Friends\u2019 ratings shown for comparison only'); break; }
@@ -1152,7 +1158,7 @@ async function onClick(e){
     case 'open': { S.open = S.open===v ? null : v; save(); document.getElementById('board').innerHTML=board(); if(S.open){ const el=document.getElementById('d-'+hash(v)); const chipEl=el&&el.previousElementSibling; const r=chipEl&&chipEl.getBoundingClientRect(); if(r && (r.top<0 || r.top>window.innerHeight*0.6)) chipEl.scrollIntoView({behavior:'smooth',block:'start'}); } else { const c=[...document.querySelectorAll('.jobchip')].find(b=>b.dataset.v===v); if(c){ const r=c.getBoundingClientRect(); if(r.top<0||r.bottom>window.innerHeight) c.scrollIntoView({behavior:'smooth',block:'center'}); } } break; }
     case 'friend-start': F=freshF(); S.prevPhase=S.phase; S.phase='friend'; S.idx=0; save(); render(); break;
     case 'copy': { const el=document.getElementById(b.dataset.src); copyText(el.value, el); break; }
-    case 'copy-profile': { copyText(profileCode(), document.getElementById('fcode-in')); break; }
+    case 'copy-profile': { copyText(profileCode(), document.getElementById('fcode-in')); if(!S.kept){ S.kept=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); } break; }
     case 'settings': grabText(); if(S.phase!=='settings'){ S.backPhase=S.phase; } S.phase='settings'; render(); break;
     case 'settings-back': S._confirmDelete=false; S.phase=S.backPhase||'intro'; render(); break;
     case 'ai-offer-yes': SET.ai=true; SET.aiOfferSeen=true; saveSet(); S.phase='refine'; S.idx=0; save(); render(); break;
@@ -1167,6 +1173,7 @@ async function onClick(e){
       fb.id = newId(); const payload = buildFeedback(); b.disabled=true;
       try{ await postFeedback(payload); } catch(e){ (SET.queue=SET.queue||[]).push(payload); toast('You\u2019re offline. It\u2019ll send when you\u2019re back online.'); }
       fb.sentId=fb.id; SET.submissions=(SET.submissions||[]).concat(fb.id); saveSet(); save(); refreshFb(); toast('Feedback sent. Thank you'); break; }
+    case 'fb-again': S.fb={}; save(); { const y=window.scrollY; render(); window.scrollTo(0,y); } break;
     case 'fb-never': SET.noFeedback=true; saveSet(); refreshFb(); toast('Got it. You can turn this back on in Settings.'); break;
     case 'set-fb': SET.noFeedback=!SET.noFeedback; saveSet(); render(); break;
     case 'set-theme': SET.theme=v; saveSet(); applyTheme(); render(); break;
@@ -1182,11 +1189,11 @@ async function onClick(e){
       S.replyEmail = em; save();
       shareLink('Describe me on Bearing', `I'm using Bearing to work out a career direction. Could you answer a few questions about me? It takes about ${minsOf(friendScreens())} minutes.`, baseUrl()+'?describe='+encodeURIComponent(S.name||'')+(em?'&reply='+encodeURIComponent(em):''), null); break; }
     case 'share-friend-back': shareLink('My answers about you', `Here's how I see you. Open this to add it to your Bearing results.`, baseUrl()+'?friend='+encode('BRG-F1.',friendOut()), document.getElementById('fcode')); break;
-    case 'share-snap': shareSnapshot(); break;
+    case 'share-snap': shareSnapshot(); if(!S.kept){ S.kept=true; save(); setTimeout(()=>{ const y=window.scrollY; render(); window.scrollTo(0,y); }, 400); } break;
     case 'share-profile': shareLink('My Bearing results', 'My career direction results from Bearing.', baseUrl()+'?profile='+profileCode(), null); break;
     case 'open-pending': S=Object.assign(fresh(), S.pendingProfile); S.done=true; S.phase='results'; save(); render(); toast('Results opened'); break;
     case 'drop-pending': S.pendingProfile=null; save(); render(); break;
-    case 'copy-prompt': { copyText(aiPrompt(), document.getElementById('fcode-in')); break; }
+    case 'copy-prompt': { copyText(aiPrompt(), document.getElementById('fcode-in')); if(!S.aiCopied){ S.aiCopied=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); } break; }
     case 'load-code': {
       const r=decode(document.getElementById('code-in').value);
       if(!r){ toast('That code wasn’t recognised. Check it was copied in full.'); break; }
