@@ -429,9 +429,9 @@ const SHARE_ICON = `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 
 const ARROW = `<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>`;
 const LEGEND = [
   ['01','Stories','What you’re drawn to'], ['02','Activities','Thirty quick ratings'], ['03','How you run','Twenty statements'],
-  ['04','What you need','What work gives you, and your kind of day'], ['05','Experience','Asked last',true], ['06','Next steps','Study and progress',true]
+  ['04','What you need','What work gives you, and your kind of day'], ['05','Experience','Past roles and hobbies, asked last',true], ['06','Shortlist','Pick up to five jobs and narrow them to two',true]
 ];
-/* Where the person is up to, for the home screen list. Parts 1-5 only (the questionnaire). */
+/* Where the person is up to, for the home screen list. Parts 1-5 are the questionnaire; part 6 is the shortlist on the results page. */
 function partStatus(){
   const out={};
   const resuming = !S.done && (S.resumePhase||'quick')==='quick';
@@ -448,6 +448,9 @@ function partStatus(){
       out[p] = {state:'current', note: n===0 ? 'Not started yet' : `${n} of ${qs.length} done`};
     } else if(reach>at[at.length-1]){ out[p]={state:'done'}; }
   }
+  if(S.done){ const r=(S.short||[]).filter(t=>jobOf(t)), n=r.filter(t=>narrowScore(t)!==null).length;
+    if(r.length>=2 && n===r.length && S.gut && S.gut.ans!==null && S.gut.ans!==undefined) out[6]={state:'done'};
+    else if(r.length) out[6]={state:'started', note:`${r.length} picked${n?`, ${n} compared`:''}. Carry on from your results.`}; }
   return out;
 }
 /* In a browser, a friend's reply or results link should end up in the app, not in the browser's own storage. */
@@ -471,7 +474,7 @@ function intro(){
     <p class="lede">Ever had the thought, “I don’t know what I want to do when I grow up”? Or are you after a career direction change, but don’t know where to go? Let’s try to help you with that.</p>
     <section class="legend" aria-label="What’s ahead">
       <div class="legend__head kicker"><span>What’s ahead</span><span>6 parts · 2 optional</span></div>
-      ${LEGEND.map(([n,name,sub,opt],i)=>{ const st=PS[i+1]||{}; const tag = st.state==='current' ? 'PAUSED HERE' : st.state==='done' ? 'DONE' : st.state==='skipped' ? 'SKIPPED' : (opt?'OPTIONAL':''); return `<div class="legend__row${opt?' legend__row--opt':''}${st.state?' legend__row--'+st.state:''}"><span class="legend__num">${st.state==='done'?'&#10003;':n}</span><div><div class="legend__name">${name}</div><div class="legend__sub">${st.state==='current'?st.note:sub}</div></div>${tag?`<span class="legend__tag">${tag}</span>`:''}</div>`; }).join('')}
+      ${LEGEND.map(([n,name,sub,opt],i)=>{ const st=PS[i+1]||{}; const tag = st.state==='current' ? 'PAUSED HERE' : st.state==='started' ? 'STARTED' : st.state==='done' ? 'DONE' : st.state==='skipped' ? 'SKIPPED' : (opt?'OPTIONAL':''); return `<div class="legend__row${opt?' legend__row--opt':''}${st.state?' legend__row--'+(st.state==='started'?'current':st.state):''}"><span class="legend__num">${st.state==='done'?'&#10003;':n}</span><div><div class="legend__name">${name}</div><div class="legend__sub">${st.note||sub}</div></div>${tag?`<span class="legend__tag">${tag}</span>`:''}</div>`; }).join('')}
     </section>
     <div class="start">
       <button class="btn" data-act="${primary[0]}">${primary[1]} ${ARROW}</button>
@@ -980,7 +983,7 @@ function extrasSection(P, D){
         ${fr.filter(f=>f.text).map(f=>`<div class="panel sub"><div class="eyebrow">${esc(f.name)} says you\u2019re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}
         <div class="lbl">Ask someone else</div>`
       : `<p>Someone who knows you well rates how you come across. Their view shows beside yours in How you run.</p>`) + friendInvite());
-  return `<section class="section" id="extras"><h2>What else counts</h2>
+  return `<section class="section" id="extras"><span class="eyebrow">Optional</span><h2>What else counts</h2>
     <p class="muted" style="margin:0">Extra evidence about you. Each one can be switched on or off in the Filter panel below.</p>
     <div class="actions">${hist}${hobs}${friends}</div></section>`;
 }
