@@ -392,3 +392,13 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 /* Also count: one switch per extra source, with its edit link */
 .alsorow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
 .panel.flash{outline:2px solid var(--brg-accent);outline-offset:3px;transition:outline-color .4s}
+
+/* Shortlist: ranked list, top two marked */
+.shortlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.shortlist li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--brg-line-soft);border-radius:var(--brg-radius);background:var(--brg-surface)}
+.shortlist li.top2{border-color:var(--brg-accent)}
+.shortlist li small{display:block;color:var(--brg-ink-3);font-size:14px}
+.shortlist .rankno{font:500 15px var(--brg-font-mono);color:var(--brg-ink-3)}
+.shortlist li.top2 .rankno{color:var(--brg-accent)}
+.jobchip .star{color:var(--brg-accent)}
+.nq{font-size:18px;margin-bottom:8px}

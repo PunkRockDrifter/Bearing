@@ -37,7 +37,7 @@ function decode(code){
 
 /* ---------- state ---------- */
 function fresh(){ return { v:1, phase:'intro', idx:0, name:'', stories:{}, stories2:{}, storyText:{}, mip:{}, ipip:{}, values:[], wfh:null, cond:{},
-  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, hobbies:[], useHobbies:true, useFriends:true, filtersOpen:true, minPay:0 }; }
+  exp:{ skills:[], q:null }, expSkipped:false, refine:{ deep:{}, drain:[] }, refineDone:false, friends:[], view:'tiers', open:null, roles:[], useHistory:false, hobbies:[], useHobbies:true, useFriends:true, short:[], narrow:{}, nq:null, gut:null, filtersOpen:true, minPay:0 }; }
 function freshF(){ return { for:'', by:'', ipip:{}, text:'' }; }
 let S = fresh(), F = null;
 const HOSTED = typeof window!=='undefined' && window.BEARING_HOSTED===true;
@@ -94,7 +94,7 @@ function buildFeedback(){
       roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
       history_used: !!S.useHistory && !testedOnly(), hobbies:(S.hobbies||[]).map(h=>({ types:h.types, love:h.love })), hobbies_used: S.useHobbies!==false && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length, friends_used: S.useFriends!==false && !testedOnly(),
       filters:{ min_pay:S.minPay||0, max_training:S.maxQ??4 },
-      tiers:{ S:sc.filter(o=>o.tier==='S').map(o=>o.j.t), A:sc.filter(o=>o.tier==='A').map(o=>o.j.t), B:sc.filter(o=>o.tier==='B').map(o=>o.j.t) }
+      shortlist: shortRanked().map(t=>({ t, a:(S.narrow||{})[t]||null })), tiers:{ S:sc.filter(o=>o.tier==='S').map(o=>o.j.t), A:sc.filter(o=>o.tier==='A').map(o=>o.j.t), B:sc.filter(o=>o.tier==='B').map(o=>o.j.t) }
     };
   }
   return out;
@@ -153,7 +153,7 @@ function friendScreens(){
   s.push({type:'ftext'}); s.push({type:'fdone'});
   return s;
 }
-function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): S.phase==='hobbyedit'?[{type:'hobbies'}]: S.phase==='roleedit'?[{type:'roles'}]: []; }
+function screens(){ return S.phase==='quick'?quickScreens(): S.phase==='refine'?refineScreens(): S.phase==='friend'?friendScreens(): S.phase==='hobbyedit'?[{type:'hobbies'}]: S.phase==='roleedit'?[{type:'roles'}]: S.phase==='narrow'?narrowScreens(): []; }
 const PART_NAMES = { quick:['Stories','Activities','How you run','What you need','Experience'], refine:['In your words','What drains you'] };
 
 /* ---------- scoring ---------- */
@@ -494,6 +494,7 @@ function progressBar(list){
   const sc = list[S.idx]; const total = list.length; const pct = Math.round(100*S.idx/Math.max(1,total-1));
   let label='', left='';
   if(S.phase==='friend'){ label=`Describing ${esc(nm())}`; left=`${Math.max(0,total-1-S.idx)} to go`; }
+  else if(S.phase==='narrow'){ label='Narrowing your shortlist'; left=sc.type==='njob'?`job ${list.slice(0,S.idx+1).filter(x=>x.type==='njob').length} of ${(S.short||[]).length}`:''; }
   else if(S.phase==='hobbyedit'||S.phase==='roleedit'){ label=S.phase==='hobbyedit'?'Hobbies and side projects':'Past roles'; left='optional'; }
   else { const names=PART_NAMES[S.phase]; label=`Part ${sc.part} of ${names.length} · ${names[sc.part-1]}`;
     const remaining = secsOf(list.slice(S.idx));
@@ -576,6 +577,28 @@ function question(){
       body = `<section class="screen"><div class="q">${esc(it.q)}</div>${SET.ai ? `<textarea id="dp-${it.id}" placeholder="Optional, for the AI coach. A few sentences is plenty.">${esc(d.text)}</textarea>` : ''}
         <div class="eyebrow">${esc(it.tagq)}</div><div class="chips">${shuffle(ORDER,it.id).map(t=>`<button class="chipbtn" data-act="tag" data-id="${it.id}" data-v="${t}" aria-pressed="${d.tags.includes(t)}">${DEEP_TAGS[t]}</button>`).join('')}</div></section>
         <div class="nav">${back}<button class="btn" data-act="next" ${d.tags.length?'':'disabled'}>Next</button></div>`; break; }
+    case 'nqual': {
+      body = `<section class="screen"><div class="q">First, your highest qualification</div><p class="hint">So Bearing can give a rough idea of the time to get into each job.</p>
+        <div class="opts">${QUALS.map((q,k)=>`<button class="opt" data-act="nqual" data-v="${k}" aria-pressed="${S.nq===k}">${esc(q)}</button>`).join('')}</div></section>
+        <div class="nav"><button class="back" data-act="narrow-exit">${BACK_ICON}Results</button><button class="btn" data-act="next" ${S.nq===null||S.nq===undefined?'disabled':''}>Next</button></div>`; break; }
+    case 'njob': {
+      const j=jobOf(sc.t), a=(S.narrow[sc.t]=S.narrow[sc.t]||{}), est=studyEstimate(j);
+      const ask=(n,extra)=>`<div class="scale-item"><div class="nq">${esc(n.q)}</div>${extra||''}<div class="chips">${n.o.map((o,k)=>`<button class="chipbtn" data-act="nans" data-id="${n.k}" data-v="${k}" aria-pressed="${a[n.k]===k}">${esc(o)}</button>`).join('')}</div></div>`;
+      const all=NQ.every(n=>a[n.k]!==undefined&&a[n.k]!==null);
+      body = `<section class="screen"><span class="eyebrow">${esc(FIELDS[j.f].name)}</span><div class="q">${esc(j.t)}</div><p class="hint">${esc(j.day)}</p>
+        ${ask(NQ[0], `<div class="links"><a href="${ytLink(j)}" target="_blank" rel="noopener">Watch day-in-the-life videos on YouTube \u2197</a></div>`)}
+        ${ask(NQ[1])}
+        ${ask(NQ[2], `<div class="lbl">Pressure in this job</div><ul class="look">${pressureFacts(j).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`)}
+        ${ask(NQ[3], est?`<div class="lbl">Rough time to get there</div><p>${esc(est)}</p>`:'')}
+        ${ask(NQ[4])}</section>
+        <div class="nav">${S.idx>0?back:`<button class="back" data-act="narrow-exit">${BACK_ICON}Results</button>`}<button class="btn" data-act="next" ${all?'':'disabled'}>Next</button></div>`; break; }
+    case 'ngut': {
+      const gp=gutPair(); const r=shortRanked(); const g=S.gut&&S.gut.alt===gp.alt&&S.gut.out===gp.out?S.gut:null;
+      body = `<section class="screen"><span class="eyebrow">Gut check</span><div class="q">Your answers put <b>${esc(r[0])}</b> and <b>${esc(r[1])}</b> on top.</div>
+        <p class="hint">${gp.swap?`If we put ${esc(gp.keep)} first instead of ${esc(gp.out)}`:`If we swapped ${esc(gp.out)} for ${esc(gp.alt)}`}, how would you feel?</p>
+        <div class="opts">${['Relieved','No different','Disappointed'].map((o,k)=>`<button class="opt" data-act="gut" data-v="${k}" aria-pressed="${g?g.ans===k:false}">${o}</button>`).join('')}</div>
+        <p class="muted" style="font-size:14px">Go with your first reaction. A relieved or disappointed feeling is worth knowing about.</p></section>
+        <div class="nav">${back}<button class="btn" data-act="narrow-done" ${g?'':'disabled'}>See my shortlist</button></div>`; break; }
     case 'swords': {
       const answered = STORIES.filter(q=>S.stories[q.id] && S.stories[q.id]!=='none');
       body = `<section class="screen"><div class="q">Your story answers, in your own words</div><p class="hint">Optional, for the AI coach. A sentence on any of these makes its read much sharper.</p>
@@ -727,7 +750,8 @@ function jobDetail(o){
     ${o.why.why.length ? `<div><div class="lbl">Why it fits</div><ul>${o.why.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div><div class="lbl">How it fits</div>${fitRows(o)}</div>
     ${(o.why.not.length||o.why.watch.length) ? `<div><div class="lbl">${o.tier==='S'?'Watch for':'Why it\u2019s not higher'}</div><ul>${o.why.not.concat(o.why.watch).map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-    <div><div class="lbl">A day in the life</div><p>${esc(j.day)}</p></div>
+    <div class="cta-row">${(S.short||[]).includes(j.t) ? `<button class="btn ghost sm" data-act="short-del" data-v="${esc(j.t)}">\u2605 On your shortlist (remove)</button>` : (S.short||[]).length>=SHORT_MAX ? `<span class="muted" style="font-size:14px">Your shortlist is full (${SHORT_MAX}). Remove one to add this.</span>` : `<button class="btn sm" data-act="short-add" data-v="${esc(j.t)}">\u2606 Add to shortlist</button>`}</div>
+    <div><div class="lbl">A day in the life</div><p>${esc(j.day)}</p><div class="links"><a href="${ytLink(j)}" target="_blank" rel="noopener">Watch day-in-the-life videos on YouTube \u2197</a></div></div>
     <div><div class="lbl">How people get in</div><p>${esc(j.path)}</p></div>
     <div><div class="lbl">Courses that lead here</div><div class="links">
       <a href="https://www.google.com/search?q=${encodeURIComponent((j.cq||COURSE_Q[j.t]||j.t)+' course Australia')}" target="_blank" rel="noopener">Search \u201c${esc(j.cq||COURSE_Q[j.t]||j.t)}\u201d courses \u2197</a>
@@ -737,7 +761,7 @@ function jobDetail(o){
       <a href="https://www.jobsandskills.gov.au/data/occupation-and-industry-profiles" target="_blank" rel="noopener">Official pay and outlook ↗</a></div>
     <div><button class="btn ghost sm" data-act="open" data-v="${esc(j.t)}">Close ${esc(j.t)}</button></div></div>`;
 }
-function chip(o){ const open = S.open===o.j.t; return `<button class="jobchip" data-act="open" data-v="${esc(o.j.t)}" aria-expanded="${open}">${esc(o.j.t)}<small>$${o.j.pay[0]}–${o.j.pay[1]}k${o.ready?' · '+READY[o.ready.lvl].toLowerCase():''}</small></button>`; }
+function chip(o){ const open = S.open===o.j.t; return `<button class="jobchip" data-act="open" data-v="${esc(o.j.t)}" aria-expanded="${open}">${(S.short||[]).includes(o.j.t)?'<span class="star" aria-label="On your shortlist">\u2605</span> ':''}${esc(o.j.t)}<small>$${o.j.pay[0]}–${o.j.pay[1]}k${o.ready?' · '+READY[o.ready.lvl].toLowerCase():''}</small></button>`; }
 function tierBoard(scored){
   return `<div class="tiers">${TIER.map(t=>{ const list=scored.filter(o=>o.tier===t); const showAll = t!=='D' || S.showD;
     const openOne = list.find(o=>o.j.t===S.open);
@@ -793,6 +817,95 @@ function board(){
   if(!list.length) return `<div class="panel"><p style="margin:0">No jobs match your filters. Lower the minimum pay, allow more training, or show jobs that clash with your strongest answers.</p></div>`;
   return S.view==='fields' ? fieldBoard(list) : tierBoard(list);
 }
+/* ---------- shortlist: pick up to 5, then narrow to 2 ---------- */
+const SHORT_MAX = 5;
+const NQ = [
+  { k:'excite', q:'Watch a couple of day-in-the-life videos. How did it make you feel?', o:['Flat','Curious','Excited','Can\u2019t stop thinking about it'], s:[0,1,2,3] },
+  { k:'bore',   q:'Every job has dull, repetitive parts. Could you live with this one\u2019s?', o:['No','Probably not','Probably','Easily'], s:[0,1,2,3] },
+  { k:'pres',   q:'How does that pressure sit with you?', o:['Too little','About right','A bit much','Too much'], s:[1,3,1.5,0] },
+  { k:'real',   q:'Could you realistically do that, given money, time and life right now?', o:['Not right now','With real effort','Yes, easily'], s:[0,2,3] },
+  { k:'regret', q:'If you never tried this, how much would you regret it?', o:['Not at all','A little','Quite a lot','A lot'], s:[0,1,2,3] },
+];
+const NW = { excite:0.25, bore:0.15, pres:0.15, real:0.2, regret:0.25 };
+const qNow = () => (!S.expSkipped && S.exp && S.exp.q!==null && S.exp.q!==undefined) ? S.exp.q : S.nq;
+function narrowScore(t){ const a=(S.narrow||{})[t]; if(!a) return null; let s=0;
+  for(const n of NQ){ if(a[n.k]===undefined||a[n.k]===null) return null; s+=NW[n.k]*n.s[a[n.k]]/3; } return s; }
+/* Shortlist in ranked order: compared jobs by your narrowing answers, then the rest in match order. */
+function shortRanked(){
+  const pos=t=>{ const i=LAST.findIndex(o=>o.j.t===t); return i<0?999:i; };
+  return (S.short||[]).filter(t=>JOBS.some(j=>j.t===t)).slice().sort((x,y)=>{ const a=narrowScore(x), b=narrowScore(y);
+    if(a!==null&&b!==null&&a!==b) return b-a; if(a!==null&&b===null) return -1; if(a===null&&b!==null) return 1; return pos(x)-pos(y); });
+}
+const jobOf = t => JOBS.find(j=>j.t===t);
+function pressureFacts(j){
+  const p = j.pr || [j.c[4], j.c[4], null, null], out=[];
+  const w=(v,hi,mid,lo,low)=> v===null||v===undefined ? null : v>=1?hi: v>=0?mid: v>=-1?lo:low;
+  out.push(w(p[0],'Strict deadlines most of the time','Regular deadlines','Some deadlines, rarely tight','Few hard deadlines'));
+  out.push(w(p[1],'Mistakes can be serious or costly','Mistakes matter, but can usually be fixed','Mistakes are usually easy to fix','Mistakes rarely cause harm'));
+  out.push(w(p[2],'Tense moments or upset people are common','Some tense moments with people','Occasional friction','Very little conflict'));
+  out.push(w(p[3],'Responsible for other people\u2019s safety or results','Some responsibility for others\u2019 work','Mostly responsible for your own work','Responsible only for your own work'));
+  if(j.c[5]>=1) out.push('Out front, dealing with the public');
+  return out.filter(Boolean);
+}
+const STUDY = ['', 'a Certificate III or IV, usually 6\u201312 months (a trade is usually a 3\u20134 year paid apprenticeship)', 'a diploma, usually 1\u20132 years full time', 'a bachelor degree, usually 3\u20134 years full time (less with credit for earlier study)', 'postgraduate study, usually 1\u20132 years on top of a degree'];
+function studyEstimate(j){
+  const q=qNow(); if(q===null||q===undefined) return null;
+  const carry=j.sk.filter(s=>(S.exp.skills||[]).includes(s)).map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase());
+  const extra = carry.length ? ` Skills that carry over: ${carry.join(', ')}.` : '';
+  if(q>=j.q) return `You already have the level of qualification usually asked for. The gap is mostly experience, a short course or a portfolio.${extra}`;
+  if(j.q===4 && q<3) return `Probably a degree (3\u20134 years) and then postgraduate study (1\u20132 years). Part time takes longer.${extra}`;
+  return `Probably ${STUDY[j.q]}. Part time takes longer.${extra}`;
+}
+const ytLink = j => `https://www.youtube.com/results?search_query=${encodeURIComponent('day in the life '+(j.sq||j.t)+' Australia')}`;
+function narrowScreens(){
+  const s=[];
+  if(S.expSkipped || !S.exp || S.exp.q===null || S.exp.q===undefined) s.push({type:'nqual'});  // stays in the list once answered, so screens don't shift
+  (S.short||[]).filter(t=>jobOf(t)).forEach(t=>s.push({type:'njob', t}));  // fixed order, so screens don't shift as answers re-rank the list
+  if((S.short||[]).length>=2) s.push({type:'ngut'});
+  return s;
+}
+function gutPair(){ const r=shortRanked(); if(r.length<2) return null; return r.length>=3 ? { keep:r[0], out:r[1], alt:r[2] } : { keep:r[1], out:r[0], alt:r[0], swap:true }; }
+function shortlistSection(){
+  const r=shortRanked(), done=r.filter(t=>narrowScore(t)!==null).length;
+  if(!r.length) return `<section class="section" id="shortlist"><h2>Your shortlist</h2><p class="muted" style="margin:0">Tap any job below, then <b>Add to shortlist</b>. Pick up to ${SHORT_MAX} that catch your eye. Then answer a few quick questions about each to narrow them down to two.</p></section>`;
+  const g=S.gut, gp=gutPair();
+  const gutNote = g && g.ans!==null && g.ans!==undefined ? (g.ans===0 ? `Your gut prefers ${esc(g.alt)} over ${esc(g.out)}. Take that seriously; it\u2019s often the truer answer.` : g.ans===2 ? `Your gut agrees with the top two.` : `Your gut doesn\u2019t mind either way between ${esc(g.out)} and ${esc(g.alt)}.`) : '';
+  return `<section class="section" id="shortlist"><h2>Your shortlist</h2>
+    <p class="muted" style="margin:0">${done ? `Ranked by your answers. The top two are where to look first.` : `In match order for now. Compare them to rank them by what matters to you.`} ${r.length<SHORT_MAX?`You can add ${SHORT_MAX-r.length} more.`:''}</p>
+    <ol class="shortlist">${r.map((t,i)=>{ const j=jobOf(t), sc=narrowScore(t);
+      return `<li class="${done&&i<2?'top2':''}"><span class="rankno">${i+1}</span><div><b>${esc(t)}</b><small>$${j.pay[0]}–${j.pay[1]}k \u00b7 ${sc===null?'not compared yet':sc>=0.7?'strong pull':sc>=0.45?'some pull':'weak pull'}</small></div>
+        <button class="linkbtn" data-act="short-del" data-v="${esc(t)}" aria-label="Remove ${esc(t)}">Remove</button></li>`; }).join('')}</ol>
+    ${gutNote?`<p>${gutNote}</p>`:''}
+    <div class="cta-row">${r.length>=2 ? `<button class="btn" data-act="narrow">${done?'Change my answers':'Compare and narrow down'}</button>` : `<span class="muted">Add at least one more job to compare.</span>`}</div>
+    ${r.length>=2 ? shortAi(done) : ''}</section>`;
+}
+function shortAi(done){
+  return `<div class="panel" id="short-ai"><h3>Take it further with AI</h3>
+    <p>For now, an AI chat gets the most out of your shortlist. Use any one you like, such as ChatGPT, Claude, Gemini or Copilot. Bearing copies a message for you; you can read it first, and nothing is sent from this app. The AI will be asked to:</p>
+    <ul class="look"><li>tell you honestly whether your top two make sense, and what you might be missing, including in your lower picks</li>
+      <li>name the dull and hard parts of each job that the videos don\u2019t show</li>
+      <li>suggest one small project, about a weekend, to test the waters for each of your top two</li>
+      <li>suggest who to talk to and where to look in Australia</li>
+      <li>work out realistic first steps from where you are now</li></ul>
+    ${done?'':`<p class="muted" style="font-size:14px">It works best after you\u2019ve compared your shortlist.</p>`}
+    <div class="cta-row"><button class="btn" data-act="short-copy">${SET.ai?'Copy message for an AI chat':'Turn on AI coach and copy'}</button></div>
+    <details><summary class="muted">See what will be copied</summary><pre class="fbpre">${esc(aiPrompt())}</pre></details></div>`;
+}
+function shortPrompt(){
+  const r=shortRanked(); if(!r.length) return '';
+  const L=['\nMY SHORTLIST (I picked these from the matches, then answered questions to rank them):'];
+  r.forEach((t,i)=>{ const j=jobOf(t), a=(S.narrow||{})[t]||{}, sc=narrowScore(t);
+    L.push(`${i+1}. ${t} ($${j.pay[0]}-${j.pay[1]}k; usual entry: ${QUALS[j.q]})${sc===null?' - not compared yet':''}`);
+    L.push(`   Pressure in this job (O*NET data): ${pressureFacts(j).join('; ').toLowerCase()}.`);
+    const est=studyEstimate(j); if(est) L.push(`   Rough time to get there from where I am: ${est}`);
+    NQ.forEach(n=>{ if(a[n.k]!==undefined&&a[n.k]!==null) L.push(`   ${n.q} -> ${n.o[a[n.k]]}`); }); });
+  const g=S.gut; if(g&&g.ans!==null&&g.ans!==undefined) L.push(`Gut check: asked how I'd feel if ${g.alt} replaced ${g.out} in my top two, I said: ${['relieved','no different','disappointed'][g.ans]}.`);
+  L.push(`\nFOR THE SHORTLIST, PLEASE:
+- Say honestly whether my top two make sense given everything above. Challenge the order if the evidence points elsewhere, and look at the lower picks for anything I've missed.
+- For each of my top two: the dull and hard parts most people don't see, one small project I could do in about a weekend to test the waters, and who I could talk to or where to look in Australia.
+- Work out realistic first steps from where I am now. Ask me what you need to know about my money, time and situation rather than guessing.`);
+  return L.join('\n');
+}
 function rankSwitches(){
   const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length), fr=S.friends||[];
   if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies, job history and friends’ ratings are off because Tested methods only is on in Settings.</span></div>`;
@@ -846,6 +959,7 @@ function results(){
     <div class="cta-row"><button class="btn" data-act="ai-offer-yes">Turn on and add my words</button><button class="btn ghost" data-act="ai-offer-no">No thanks</button></div></div></section>` : ''}
   ${friendsHtml}
   ${historySection(P, D)}
+  ${shortlistSection()}
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
     <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${!testedOnly()&&S.useHobbies!==false&&(S.hobbies||[]).some(h=>h.types.length)?'Your hobbies are adjusting this ranking. ':''}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
@@ -925,6 +1039,7 @@ MY RESULTS`);
   const tierLine = t => sc.filter(o=>o.tier===t).map(o=>o.j.t).join(', ');
   L.push(`\nQuestionnaire job matches (from a fixed list of ${JOBS.length} Australian jobs, so treat as a starting point):\nTop matches: ${tierLine('S')||'none'}\nStrong matches: ${tierLine('A')||'none'}\nGood matches: ${tierLine('B')||'none'}\nRuled out (unlikely), for contrast: ${sc.filter(o=>o.tier==='D').slice(-6).map(o=>o.j.t).join(', ')}`);
   if(S.minPay) L.push(`I need roles that can pay at least $${S.minPay}k a year.`);
+  const sp=shortPrompt(); if(sp) L.push(sp);
   return L.join('\n');
 }
 
@@ -990,6 +1105,15 @@ async function onClick(e){
     case 'hobby-del': grabText(); S.hobbies.splice(+v,1); save(); render(); break;
     case 'hobby-type': { grabText(); const h=S.hobbies[+id]; const i=h.types.indexOf(v); if(i>=0) h.types.splice(i,1); else if(h.types.length<2) h.types.push(v); save(); render(); break; }
     case 'hobby-love': grabText(); S.hobbies[+id].love=+v; save(); render(); break;
+    case 'short-add': { S.short=S.short||[]; if(!S.short.includes(v) && S.short.length<SHORT_MAX) S.short.push(v); save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(`Added to your shortlist (${S.short.length} of ${SHORT_MAX})`); break; }
+    case 'short-del': { S.short=(S.short||[]).filter(t=>t!==v); if(S.narrow) delete S.narrow[v]; S.gut=null; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast('Removed from your shortlist'); break; }
+    case 'narrow': S.phase='narrow'; S.idx=0; save(); render(); break;
+    case 'narrow-exit': S.phase='results'; save(); render(); { const el=document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); } break;
+    case 'nqual': S.nq=+v; save(); render(); setTimeout(next, 220); break;
+    case 'nans': { const t=screens()[S.idx].t; S.narrow[t]=S.narrow[t]||{}; S.narrow[t][id]=+v; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
+    case 'gut': { const gp=gutPair(); S.gut={ out:gp.out, alt:gp.alt, ans:+v }; save(); render(); break; }
+    case 'narrow-done': S.phase='results'; save(); render(); { const el=document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); } toast('Shortlist ranked'); break;
+    case 'short-copy': { if(!SET.ai){ SET.ai=true; saveSet(); } copyText(aiPrompt(), null); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
     case 'role-edit': S.phase='roleedit'; S.idx=0; save(); render(); break;
     case 'role-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
     case 'friends-use': { S.useFriends=S.useFriends===false; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useFriends?'Friends\u2019 ratings now count':'Friends\u2019 ratings shown for comparison only'); break; }

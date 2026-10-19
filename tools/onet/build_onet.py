@@ -13,6 +13,7 @@ What it writes per job:
   v    work values [achievement, independence, recognition, relationships, support,
        working conditions], 1-7 (O*NET 30.2 work values, EX scale; dropped from O*NET after 30.2).
        If an occupation has none, borrowed from its most related occupation that does (vsrc).
+  pr   pressure facts (deadlines, mistakes, conflict, responsibility for others), same scale as c
   c    working conditions in Bearing's COND order, -2..2: each is the occupation's percentile
        among all O*NET occupations on the listed work-context items, rescaled ((pct - 0.5) * 4).
   wfh  share of the matched occupations that can be done from home under Dingel & Neiman (2020)
@@ -64,15 +65,22 @@ COND = {
     'vis':  [('4.C.1.b.1.f', 1), ('4.C.1.a.2.c', 1)],     # deal with the public; public speaking
     'phys': [('4.C.2.d.1.a', -1), ('4.C.2.d.1.b', 1)],    # time sitting, reversed; time standing
 }
+# Pressure facts for the shortlist, same percentile scale: deadlines, mistakes, conflict, responsibility for others.
+PRESS = {
+    'time':     [('4.C.3.d.1', 1)],                         # time pressure
+    'error':    [('4.C.3.a.1', 1)],                         # consequence of error
+    'conflict': [('4.C.1.d.1', 1), ('4.C.1.d.2', 1)],       # conflict situations; unpleasant or angry people
+    'others':   [('4.C.1.c.1', 1), ('4.C.1.c.2', 1)],       # responsible for others' health and safety; for others' results
+}
 pct = {}
-for items in COND.values():
+for items in list(COND.values()) + list(PRESS.values()):
     for el, _ in items:
         vals = sorted(v[el] for v in cx.values() if el in v)
         pct[el] = lambda x, vals=vals: (sum(1 for y in vals if y < x) + 0.5 * sum(1 for y in vals if y == x)) / len(vals)
 
-def conditions(code):
+def conditions(code, spec=COND):
     out = []
-    for k, items in COND.items():
+    for k, items in spec.items():
         ps = [(pct[el](cx[code][el]) if s > 0 else 1 - pct[el](cx[code][el])) for el, s in items if el in cx[code]]
         if not ps:
             return None
@@ -120,6 +128,7 @@ def one(code):
     d['vsrc'] = None if src == code else (f'{src} {occ.get(src, "")}' if src else None)
     csrc = code if cx.get(code) and im.get(code) else next((r for r in related.get(code, []) if cx.get(r) and im.get(r)), None)
     d['c'] = conditions(csrc) if csrc else None
+    d['pr'] = conditions(csrc, PRESS) if csrc else None
     d['wfh'] = can_wfh(csrc) if csrc else None
     if csrc and csrc != code:
         d['csrc'] = f'{csrc} {occ.get(csrc, "")}'
@@ -128,7 +137,7 @@ def one(code):
 def combine(codes):
     parts = [one(c) for c in codes]
     out = {}
-    for k in ('ri', 'v', 'c'):
+    for k in ('ri', 'v', 'c', 'pr'):
         xs = [p[k] for p in parts if p.get(k)]
         out[k] = [round(mean(col), 2) for col in zip(*xs)] if xs else None
     zs = [p['z'] for p in parts if p['z']]
@@ -152,6 +161,7 @@ for title, (code, fit) in M.items():
     if d.get('v'): e['v'] = [round(x, 2) for x in d['v']]
     if d.get('vsrc'): e['vsrc'] = d['vsrc']
     if d.get('c'): e['c'] = d['c']
+    if d.get('pr'): e['pr'] = [round(x, 1) for x in d['pr']]
     if d.get('wfh') is not None: e['wfh'] = d['wfh']
     if d.get('csrc'): e['csrc'] = d['csrc']
     entries[title] = e
@@ -165,7 +175,8 @@ print('''/* Job data from O*NET, matched by hand to Bearing's Australian jobs. G
    soc = O*NET-SOC code (or blend); fit = good | close | loose | rater (no O*NET data, see src);
    ri = interests [R,I,A,S,E,C]; z = job zone; v = work values [achievement, independence, recognition,
    relationships, support, working conditions]; vsrc = values borrowed from this related occupation;
-   c = working conditions in COND order, -2..2 (percentile among O*NET occupations); wfh = can be done from home (0-1);
+   c = working conditions in COND order, -2..2 (percentile among O*NET occupations);
+   pr = pressure facts [deadlines, mistakes, conflict, responsibility for others], same scale; wfh = can be done from home (0-1);
    csrc = conditions borrowed from this related occupation. */
 const ONET = {''')
 print(',\n'.join('  ' + json.dumps(t) + ': ' + json.dumps(e, separators=(',', ':')) for t, e in entries.items()))
@@ -177,6 +188,7 @@ JOBS.forEach(j => {
   j.soc = o.soc; j.fit = o.fit; j.zone = o.z || null; j.values = o.v || null;
   j.wfh = (o.wfh === undefined) ? null : o.wfh;
   if (o.c) j.c = o.c;
+  j.pr = o.pr || null;
   if (!o.ri) return;
   j.ri = { R:o.ri[0], I:o.ri[1], A:o.ri[2], S:o.ri[3], E:o.ri[4], C:o.ri[5] };
   j.code0 = j.code;
