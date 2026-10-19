@@ -292,8 +292,9 @@ function readiness(j, st){
   if(st.expSkipped || st.exp.q===null || st.exp.q===undefined) return null;
   const carry = j.sk.filter(s=>st.exp.skills.includes(s));
   let lvl = 2;
-  if(st.exp.q>=j.q && carry.length>=1) lvl=0;
-  else if(j.q-st.exp.q<=1 || carry.length>=2) lvl=1;
+  const q=effQ(st.exp.q, st.exp.qf, j);
+  if(q>=j.q && carry.length>=1) lvl=0;
+  else if(j.q-q<=1 || carry.length>=2) lvl=1;
   return { lvl, carry: carry.map(s=>SKILLS.find(x=>x[0]===s)[1]) };
 }
 function directionOf(P){
@@ -483,7 +484,7 @@ function intro(){
     <p class="privacy">Everything stays on this device. Nothing is sent anywhere, and no AI is involved unless you opt in. <button class="linkbtn" data-act="settings">Settings</button></p>
     ${S.pendingProfile ? `<div class="card-dashed pending"><div class="kicker">Shared with you</div><h2>You opened someone’s results</h2><p>Opening them replaces the results saved on this device.</p><button class="btn" data-act="open-pending">Open their results</button><button class="btn ghost" data-act="drop-pending" style="margin-top:10px">Not now</button></div>` : ''}
   </section>
-  <details class="more-options"><summary>Other options: describe a friend, or reopen results with a code</summary>
+  <details class="more-options"><summary><span class="mo-plus" aria-hidden="true">+</span><span><b>Other options</b><small>Describe a friend for them, or reopen results with a code</small></span></summary>
   <section class="cards">
     <div class="card-dashed"><div class="kicker">Second opinion</div><h2>Answering for a friend?</h2>
       <p>If someone asked you to describe them, start here. It takes about ${minsOf(friendScreens())} minutes, and you’ll get ${LINKS?'a link':'a code'} to send back to them.</p>
@@ -554,7 +555,8 @@ function question(){
       body = `<section class="interlude" style="padding-top:20px"><span class="num">PART 05 · OPTIONAL</span><h2>Your experience</h2>
         <p class="hint" style="font-size:17px">Your direction and matches are already worked out. This adds a note on each job saying how quickly you could step into it and which skills carry over. Next you can add past roles.</p></section>
         <div class="panel"><div class="eyebrow">Things you’ve done a fair bit of, at work or outside it</div><div class="chips">${SKILLS.map(([k,l])=>`<button class="chipbtn" data-act="skill" data-v="${k}" aria-pressed="${S.exp.skills.includes(k)}">${l}</button>`).join('')}</div>
-          <div class="eyebrow" style="margin-top:6px">Highest qualification</div><div class="chips">${QUALS.map((q,i)=>`<button class="chipbtn" data-act="qual" data-v="${i}" aria-pressed="${S.exp.q===i}">${q}</button>`).join('')}</div></div>
+          <div class="eyebrow" style="margin-top:6px">Highest qualification</div><div class="chips">${QUALS.map((q,i)=>`<button class="chipbtn" data-act="qual" data-v="${i}" aria-pressed="${S.exp.q===i}">${q}</button>`).join('')}</div>
+          ${S.exp.q>0 ? `<div class="eyebrow" style="margin-top:6px">What field is it in?</div><div class="chips">${QFIELDS.map(([k,l])=>`<button class="chipbtn" data-act="qfield" data-v="${k}" aria-pressed="${S.exp.qf===k}">${esc(l)}</button>`).join('')}</div>` : ''}</div>
         <div class="nav">${back}<div class="cta-row"><button class="btn ghost" data-act="skip-exp">Skip</button><button class="btn" data-act="next" ${S.exp.q===null?'disabled':''}>Next</button></div></div>`; break; }
     case 'roles': {
       const roles = S.roles.length ? S.roles : [], solo = S.phase==='roleedit';
@@ -584,8 +586,9 @@ function question(){
         <div class="nav">${back}<button class="btn" data-act="next" ${d.tags.length?'':'disabled'}>Next</button></div>`; break; }
     case 'nqual': {
       body = `<section class="screen"><div class="q">First, your highest qualification</div><p class="hint">So Bearing can give a rough idea of the time to get into each job.</p>
-        <div class="opts">${QUALS.map((q,k)=>`<button class="opt" data-act="nqual" data-v="${k}" aria-pressed="${S.nq===k}">${esc(q)}</button>`).join('')}</div></section>
-        <div class="nav"><button class="back" data-act="narrow-exit">${BACK_ICON}Results</button><button class="btn" data-act="next" ${S.nq===null||S.nq===undefined?'disabled':''}>Next</button></div>`; break; }
+        <div class="opts">${QUALS.map((q,k)=>`<button class="opt" data-act="nqual" data-v="${k}" aria-pressed="${S.nq===k}">${esc(q)}</button>`).join('')}</div>
+        ${S.nq>0 ? `<div class="eyebrow" style="margin-top:14px">What field is it in?</div><div class="chips">${QFIELDS.map(([k,l])=>`<button class="chipbtn" data-act="nqfield" data-v="${k}" aria-pressed="${S.nqf===k}">${esc(l)}</button>`).join('')}</div>` : ''}</section>
+        <div class="nav"><button class="back" data-act="narrow-exit">${BACK_ICON}Results</button><button class="btn" data-act="next" ${S.nq===null||S.nq===undefined||(S.nq>0&&!S.nqf)?'disabled':''}>Next</button></div>`; break; }
     case 'njob': {
       const j=jobOf(sc.t), a=(S.narrow[sc.t]=S.narrow[sc.t]||{}), est=studyEstimate(j);
       const ask=(n,extra)=>`<div class="scale-item"><div class="nq">${esc(n.q)}</div>${extra||''}<div class="chips">${n.o.map((o,k)=>`<button class="chipbtn" data-act="nans" data-id="${n.k}" data-v="${k}" aria-pressed="${a[n.k]===k}">${esc(o)}</button>`).join('')}</div></div>`;
@@ -832,6 +835,17 @@ const NQ = [
   { k:'regret', q:'If you never tried this, how much would you regret it?', o:['Not at all','A little','Quite a lot','A lot'], s:[0,1,2,3] },
 ];
 const NW = { excite:0.25, bore:0.15, pres:0.15, real:0.2, regret:0.25 };
+const QFIELDS = Object.entries(FIELDS).map(([k,f])=>[k,f.name]).concat([['other','Something else or general']]);
+/* Fields close enough that a qualification in one counts for some of the other. */
+const NEAR = { tech:['eng','sci','creative'], eng:['tech','sci','mine','trade','ops'], sci:['health','eng','tech','land'], health:['sci','comm','sport'],
+  comm:['health','edu','gov'], edu:['comm','sport'], biz:['fin','admin','sales','gov'], fin:['biz','admin'], admin:['biz','fin','service','gov'],
+  sales:['biz','retail','service'], service:['retail','admin','sales','hosp'], retail:['service','sales','hosp'], hosp:['retail','service'],
+  creative:['tech','sales'], gov:['biz','comm','admin'], trade:['eng','ops','mine'], ops:['trade','mine','eng'], mine:['eng','trade','ops'], land:['sci'], sport:['health','edu'] };
+const qFieldNow = () => (!S.expSkipped && S.exp && S.exp.q!==null && S.exp.q!==undefined) ? S.exp.qf : S.nqf;
+/* How far a qualification gets you toward a job: full value in the same field (or if the field isn't given),
+   one level less in a nearby field, and in an unrelated field a degree counts about like a diploma. */
+function fieldFit(f, j){ return !f || f==='other' || f===j.f ? 'same' : (NEAR[f]||[]).includes(j.f) ? 'near' : 'other'; }
+function effQ(q, f, j){ const k=fieldFit(f,j); return k==='same' ? q : k==='near' ? (q>=3 ? q-1 : q) : (q>=3 ? 2 : 0); }
 const qNow = () => (!S.expSkipped && S.exp && S.exp.q!==null && S.exp.q!==undefined) ? S.exp.q : S.nq;
 function narrowScore(t){ const a=(S.narrow||{})[t]; if(!a) return null; let s=0;
   for(const n of NQ){ if(a[n.k]===undefined||a[n.k]===null) return null; s+=NW[n.k]*n.s[a[n.k]]/3; } return s; }
@@ -855,11 +869,17 @@ function pressureFacts(j){
 const STUDY = ['', 'a Certificate III or IV, usually 6\u201312 months (a trade is usually a 3\u20134 year paid apprenticeship)', 'a diploma, usually 1\u20132 years full time', 'a bachelor degree, usually 3\u20134 years full time (less with credit for earlier study)', 'postgraduate study, usually 1\u20132 years on top of a degree'];
 function studyEstimate(j){
   const q=qNow(); if(q===null||q===undefined) return null;
+  const f=qFieldNow(), fit=fieldFit(f,j), e=effQ(q,f,j), fname=f&&FIELDS[f]?FIELDS[f].name:'';
   const carry=j.sk.filter(s=>(S.exp.skills||[]).includes(s)).map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase());
   const extra = carry.length ? ` Skills that carry over: ${carry.join(', ')}.` : '';
-  if(q>=j.q) return `You already have the level of qualification usually asked for. The gap is mostly experience, a short course or a portfolio.${extra}`;
-  if(j.q===4 && q<3) return `Probably a degree (3\u20134 years) and then postgraduate study (1\u20132 years). Part time takes longer.${extra}`;
-  return `Probably ${STUDY[j.q]}. Part time takes longer.${extra}`;
+  const diff = q>0 && fit!=='same' ? `Your qualification (${fname}) is in ${fit==='near'?'a nearby':'a different'} field, so it counts for less here. ` : '';
+  if(e>=j.q) return q>=j.q && fit==='same' ? `You already have the level of qualification usually asked for. The gap is mostly experience, a short course or a portfolio.${extra}`
+    : fit==='near' ? `${diff}Your level of study is usually enough, but expect a short course or some experience in this area first.${extra}`
+    : `${diff}Employers here usually look for skills more than a matching qualification, but expect 6\u201312 months building them through a course, bootcamp or projects.${extra}`;
+  if(fit!=='same' && q>=3 && j.q===3) return `${diff}Probably a graduate certificate or diploma (6 months to 1 year) or a graduate-entry master’s (about 2 years), since you already hold a degree.${extra}`;
+  if(fit!=='same' && q>=3 && j.q===4) return `${diff}Probably a graduate-entry postgraduate course, usually 2–4 years (longer for some, such as medicine).${extra}`;
+  if(j.q===4 && e<3) return `${diff}Probably a degree (3–4 years) and then postgraduate study (1–2 years). Part time takes longer.${extra}`;
+  return `${diff}Probably ${STUDY[j.q]}. Part time takes longer.${extra}`;
 }
 const ytLink = j => `https://www.youtube.com/results?search_query=${encodeURIComponent('day in the life '+(j.sq||j.t)+' Australia')}`;
 function narrowScreens(){
@@ -938,11 +958,11 @@ function optPanel(id, title, done, doneWord, inner){
 }
 function rankSwitches(){
   const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length), fr=S.friends||[];
-  if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies, job history and friends’ ratings are off because Tested methods only is on in Settings.</span></div>`;
+  if(testedOnly()) return `<div class="frow"><span class="eyebrow">Filter by</span><span class="muted" style="font-size:14px">Hobbies, job history and friends’ ratings are off because Tested methods only is on in Settings.</span></div>`;
   const row = (on, act, label, editAct, editLabel, addLabel) => `<div class="alsorow">${on===null
       ? `<button class="chipbtn sm" data-act="${editAct}">${addLabel}</button>`
       : `<button class="toggle-sw" data-act="${act}" aria-pressed="${on}"><span></span>${label}</button><button class="linkbtn" data-act="${editAct}">${editLabel}</button>`}</div>`;
-  return `<div class="frow"><span class="eyebrow">Also count</span>
+  return `<div class="frow"><span class="eyebrow">Filter by</span>
     ${row(hb.length?S.useHobbies!==false:null, 'hobbies-use', `My hobbies (${hb.map(h=>esc(h.t||'unnamed')).join(', ')})`, 'hobby-edit', 'Edit', '+ Add hobbies')}
     ${row(roles.length?!!S.useHistory:null, 'history', `My job history (${roles.length} role${roles.length>1?'s':''})`, 'role-edit', 'Edit', '+ Add job history')}
     ${row(fr.length?S.useFriends!==false:null, 'friends-use', `Friends’ ratings (${fr.map(f=>esc(f.data.by||'a friend')).join(', ')})`, 'friend-jump', 'Ask another', '+ Ask a friend to rate you')}</div>`;
@@ -969,13 +989,13 @@ function extrasSection(P, D){
         return `<div class="panel sub"><div class="eyebrow">${esc(v.label)}</div><h3>${esc(r.t||'Unnamed role')}</h3>
           ${r.types.length?`<p class="muted">Mostly ${r.types.map(t=>TYPES[t].name).join(' and ')} work. ${inDir(r.types)?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}
           ${v.text?`<p>${esc(v.text)}</p>`:''}</div>`; }).join('')}</div>
-        <p class="muted" style="font-size:14px;margin:0">${S.useHistory&&!T?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Also count.'}</p>
+        <p class="muted" style="font-size:14px;margin:0">${S.useHistory&&!T?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Filter by.'}</p>
         <div class="cta-row">${roles.length<3?`<button class="btn ghost sm" data-act="role-new">+ Add a role</button>`:''}<button class="btn ghost sm" data-act="role-edit">Edit roles</button></div>`
       : `<p>Up to three jobs or big roles you\u2019ve had, paid or not. Ones you enjoyed and did well can lift similar work in your list, if you switch that on.</p><div><button class="btn ghost sm" data-act="role-new">+ Add a role</button></div>`);
   const hobs = foldPanel('x-hobbies','Hobbies and side projects', hb.length, `${hb.length} added \u00b7 ${on(S.useHobbies!==false)}`,
     hb.length ? `<div class="actions">${hb.map(h=>`<div class="panel sub"><div class="eyebrow">${h.love!=null?esc(LOVE[h.love]):'Not rated'}</div><h3>${esc(h.t||'Unnamed hobby')}</h3>
           ${h.types.length?`<p class="muted">Mostly ${h.types.map(t=>TYPES[t].name).join(' and ')}. ${inDir(h.types)?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}</div>`).join('')}</div>
-        <p class="muted" style="font-size:14px;margin:0">${S.useHobbies!==false&&!T?'Adjusting your ranking: hobbies you love nudge your interests toward that kind of work.':'Not adjusting your ranking. Switch it on in the Filter panel under Also count.'}</p>
+        <p class="muted" style="font-size:14px;margin:0">${S.useHobbies!==false&&!T?'Adjusting your ranking: hobbies you love nudge your interests toward that kind of work.':'Not adjusting your ranking. Switch it on in the Filter panel under Filter by.'}</p>
         <div class="cta-row">${hb.length<3?`<button class="btn ghost sm" data-act="hobby-new">+ Add a hobby</button>`:''}<button class="btn ghost sm" data-act="hobby-edit">Edit hobbies</button></div>`
       : `<p>Up to three things you do for the love of it. They nudge your interests toward that kind of work.</p><div><button class="btn ghost sm" data-act="hobby-new">+ Add a hobby</button></div>`);
   const friends = foldPanel('opt-friend','Friends\u2019 views', fr.length, `${fr.length} added \u00b7 ${T?'comparison only':S.useFriends!==false?'counting':'comparison only'}`,
@@ -996,7 +1016,7 @@ function historySection(P, D){
       return `<div class="panel"><div class="eyebrow">${esc(v.label)}</div><h3>${esc(r.t||'Unnamed role')}</h3>
         ${r.types.length?`<p class="muted">Mostly ${r.types.map(t=>TYPES[t].name).join(' and ')} work. ${inDir?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}
         ${v.text?`<p>${esc(v.text)}</p>`:''}</div>`; }).join('')}</div>
-    <p class="muted" style="font-size:14px">${S.useHistory&&!testedOnly()?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Also count.'}</p></section>`;
+    <p class="muted" style="font-size:14px">${S.useHistory&&!testedOnly()?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Filter by.'}</p></section>`;
 }
 function results(){
   const P = profile(S), D = directionOf(P), scored = scoreJobs(P, S); LAST = scored;
@@ -1091,7 +1111,7 @@ MY RESULTS`);
   if(roles.length) L.push('\nPast roles (judge these as evidence about what I enjoy and do well, not as a track to stay on):\n'+roles.map(r=>{ const v=roleVerdict(r); return `- ${r.t||'Unnamed role'}: mostly ${r.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'} work; good at it: ${r.good!=null?GOOD[r.good].toLowerCase():'?'}; enjoyed it: ${r.enjoy!=null?ENJOY[r.enjoy].toLowerCase():'?'} (${v.label.toLowerCase()})`; }).join('\n'));
   const hobbies=(S.hobbies||[]).filter(h=>h.t||h.types.length);
   if(hobbies.length) L.push('\nHobbies and side projects (what I choose to do for the love of it):\n'+hobbies.map(h=>`- ${h.t||'Unnamed'}: mostly ${h.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'}; ${h.love!=null?LOVE[h.love].toLowerCase():'?'}`).join('\n'));
-  if(!S.expSkipped && S.exp.q!==null) L.push(`Qualification: ${QUALS[S.exp.q]}. Skills I've used a lot: ${S.exp.skills.map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase()).join(', ')||'not given'}.`);
+  if(!S.expSkipped && S.exp.q!==null) L.push(`Qualification: ${QUALS[S.exp.q]}${S.exp.qf&&FIELDS[S.exp.qf]?` in ${FIELDS[S.exp.qf].name.toLowerCase()}`:''}. Skills I've used a lot: ${S.exp.skills.map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase()).join(', ')||'not given'}.`);
   const tierLine = t => sc.filter(o=>o.tier===t).map(o=>o.j.t).join(', ');
   L.push(`\nQuestionnaire job matches (from a fixed list of ${JOBS.length} Australian jobs, so treat as a starting point):\nTop matches: ${tierLine('S')||'none'}\nStrong matches: ${tierLine('A')||'none'}\nGood matches: ${tierLine('B')||'none'}\nRuled out (unlikely), for contrast: ${sc.filter(o=>o.tier==='D').slice(-6).map(o=>o.j.t).join(', ')}`);
   if(S.minPay) L.push(`I need roles that can pay at least $${S.minPay}k a year.`);
@@ -1165,7 +1185,7 @@ async function onClick(e){
     case 'short-del': { S.short=(S.short||[]).filter(t=>t!==v); if(S.narrow) delete S.narrow[v]; S.gut=null; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast('Removed from your shortlist'); break; }
     case 'narrow': S.phase='narrow'; S.idx=0; save(); render(); break;
     case 'narrow-exit': S.phase='results'; save(); render(); { const el=document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); } break;
-    case 'nqual': S.nq=+v; save(); render(); setTimeout(next, 220); break;
+    case 'nqual': S.nq=+v; if(!S.nq) S.nqf=null; save(); render(); if(!S.nq) setTimeout(next, 220); break;
     case 'nans': { const t=screens()[S.idx].t; S.narrow[t]=S.narrow[t]||{}; S.narrow[t][id]=+v; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
     case 'gut': { const gp=gutPair(); S.gut={ out:gp.out, alt:gp.alt, ans:+v }; save(); render(); break; }
     case 'narrow-done': S.phase='results'; save(); render(); { const el=document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); } toast('Shortlist ranked'); break;
@@ -1181,7 +1201,9 @@ async function onClick(e){
     case 'hobbies-use': { S.useHobbies=!S.useHobbies; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHobbies?'Hobbies now adjust the ranking':'Ranking ignores your hobbies'); break; }
     case 'history': { S.useHistory=!S.useHistory; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHistory?'History now adjusts the ranking':'Ranking ignores your history'); break; }
     case 'skill': { const i=S.exp.skills.indexOf(v); if(i>=0) S.exp.skills.splice(i,1); else S.exp.skills.push(v); save(); render(); break; }
-    case 'qual': S.exp.q=+v; save(); render(); break;
+    case 'qual': S.exp.q=+v; if(!S.exp.q) S.exp.qf=null; save(); render(); break;
+    case 'qfield': S.exp.qf=v; save(); render(); break;
+    case 'nqfield': S.nqf=v; save(); render(); break;
     case 'skip-exp': S.expSkipped=true; S.exp={skills:[],q:null}; S.done=true; mergePending(); S.phase='results'; save(); render(); break;
     case 'finish': S.expSkipped=false; S.done=true; mergePending(); S.phase='results'; save(); render(); break;
     case 'tag': { grabText(); const d=S.refine.deep[id]||{text:'',tags:[]}; const i=d.tags.indexOf(v); if(i>=0) d.tags.splice(i,1); else if(d.tags.length<2) d.tags.push(v); S.refine.deep[id]=d; save(); render(); break; }
