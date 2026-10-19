@@ -879,19 +879,26 @@ function shortlistSection(){
         <button class="linkbtn" data-act="short-del" data-v="${esc(t)}" aria-label="Remove ${esc(t)}">Remove</button></li>`; }).join('')}</ol>
     ${gutNote?`<p>${gutNote}</p>`:''}
     <div class="cta-row">${r.length>=2 ? `<button class="btn" data-act="narrow">${done?'Change my answers':'Compare and narrow down'}</button>` : `<span class="muted">Add at least one more job to compare.</span>`}</div>
-    ${r.length>=2 ? shortAi(done) : ''}</section>`;
+    ${r.length>=2 ? `<p class="muted" style="margin:0;font-size:15px">Next: <b>Take it further with AI coach</b> below, which includes your ranked shortlist.</p>` : ''}</section>`;
 }
-function shortAi(done){
-  return `<div class="panel" id="short-ai"><div class="headpair"><span class="eyebrow">Take it further with</span><h3>AI coach</h3></div>
-    <p>For now, an AI chat gets the most out of your shortlist. Use any one you like, such as ChatGPT, Claude, Gemini or Copilot. Bearing copies a message for you; you can read it first, and nothing is sent from this app. The AI will be asked to:</p>
-    <ul class="look"><li>tell you honestly whether your top two make sense, and what you might be missing, including in your lower picks</li>
-      <li>name the dull and hard parts of each job that the videos don\u2019t show</li>
+function aiPanel(){
+  const r=shortRanked(), done=r.filter(t=>narrowScore(t)!==null).length, hasShort=r.length>=2;
+  const inner = `<p>For now, an AI chat gets the most out of your results. Use any one you like, such as ChatGPT, Claude, Gemini or Copilot. Bearing copies a message for you; you can read it first, and nothing is sent from this app. The AI will be asked to:</p>
+    <ul class="look">${hasShort
+      ? `<li>tell you honestly whether your top two make sense, and what you might be missing, including in your lower picks</li>
+      <li>name the dull and hard parts of each job that the videos don’t show</li>
       <li>suggest one small project, about a weekend, to test the waters for each of your top two</li>
-      <li>suggest who to talk to and where to look in Australia</li>
+      <li>suggest who to talk to and where to look in Australia</li>`
+      : `<li>talk through your direction with you, and point out where your answers pull against each other</li>
+      <li>suggest jobs worth a look, including ones not on Bearing’s list</li>`}
       <li>work out realistic first steps from where you are now</li></ul>
-    ${done?'':`<p class="muted" style="font-size:14px">It works best after you\u2019ve compared your shortlist.</p>`}
+    ${!hasShort ? `<p class="muted" style="font-size:14px">Tip: shortlist a few jobs and compare them first. The AI can then help you test your top two.</p>` : !done ? `<p class="muted" style="font-size:14px">It works best after you’ve compared your shortlist.</p>` : ''}
     <div class="cta-row"><button class="btn" data-act="short-copy">${SET.ai?'Copy message for an AI chat':'Turn on AI coach and copy'}</button></div>
-    <details><summary class="muted">See what will be copied</summary><pre class="fbpre">${esc(aiPrompt())}</pre></details></div>`;
+    <details><summary class="muted">See what will be copied</summary><pre class="fbpre">${esc(aiPrompt())}</pre></details>`;
+  const title = `<div class="headpair"><span class="eyebrow">Take it further with</span><h3>AI coach</h3></div>`;
+  return S.aiCopied
+    ? `<details class="panel optdone" id="ai-panel"><summary><span class="tick" aria-hidden="true">✓</span><span class="optname">AI coach</span><span class="muted">Copied</span></summary><div class="optbody">${inner}</div></details>`
+    : `<div class="panel" id="ai-panel">${title}${inner}</div>`;
 }
 function shortPrompt(){
   const r=shortRanked(); if(!r.length) return '';
@@ -1000,9 +1007,7 @@ function results(){
          <details class="saymore"><summary>Got a code instead?</summary><textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button></details>`
       : `<p>Send someone who knows you well the app. They choose “Describe a friend”, answer about you, and send you a code. Paste it here.</p>
       <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}`)}
-    ${optPanel('ai-panel','AI coach', !!S.aiCopied, 'Copied', `${SET.ai
-      ? `<p>Copies your results as a prompt you can paste into any AI chat for a fuller conversation about direction and next steps.</p><div class="cta-row"><button class="btn" data-act="copy-prompt">Copy prompt for an AI coach</button></div>`
-      : `<p>Optional. Turn it on to get a prompt you can paste into any AI chat. Nothing is sent from this app.</p><button class="btn ghost" data-act="settings">Turn on in Settings</button>`}`)}
+    ${aiPanel()}
     ${optPanel('opt-share','Keep or share', !!S.kept, 'Saved', `<p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
       <div class="cta-row"><button class="btn ghost sm" data-act="share-snap">${SHARE_ICON}Share my Bearing</button><button class="btn ghost sm" data-act="copy-profile">Copy code</button></div>`)}
   </div></section>

@@ -427,3 +427,4 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .optdone .optname{font:400 22px/1.1 var(--brg-font-display);flex:1}
 .optdone[open] summary{border-bottom:1px solid var(--brg-line-soft)}
 .optdone .optbody{padding:18px;display:flex;flex-direction:column;gap:12px}
+.headpair h3{font-size:clamp(30px,6vw,38px);line-height:1.05}
