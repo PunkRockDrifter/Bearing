@@ -944,6 +944,46 @@ function rankSwitches(){
     ${row(roles.length?!!S.useHistory:null, 'history', `My job history (${roles.length} role${roles.length>1?'s':''})`, 'role-edit', 'Edit', '+ Add job history')}
     ${row(fr.length?S.useFriends!==false:null, 'friends-use', `Friends’ ratings (${fr.map(f=>esc(f.data.by||'a friend')).join(', ')})`, 'friend-jump', 'Ask another', '+ Ask a friend to rate you')}</div>`;
 }
+function friendInvite(){ return `${LINKS
+      ? `<p>Send an invite to someone who knows you well. They answer about ${minsOf(friendScreens())} minutes of questions about you, then send their answers back to you.</p>
+         <label class="eyebrow" for="reply-in">Your email, so their answers come straight back to you (optional)</label>
+         <input id="reply-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(S.replyEmail||'')}">
+         <button class="btn" data-act="share-invite">Send an invite</button>
+         <details class="saymore"><summary>Got a code instead?</summary><textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button></details>`
+      : `<p>Send someone who knows you well the app. They choose “Describe a friend”, answer about you, and send you a code. Paste it here.</p>
+      <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}`; }
+function foldPanel(id, title, n, status, inner){
+  if(!n) return `<div class="panel" id="${id}"><h3>${title}</h3>${inner}</div>`;
+  return `<details class="panel optdone" id="${id}"${S.openPanel===id?' open':''}><summary><span class="tick" aria-hidden="true">\u2713</span><span class="optname">${title}</span><span class="muted">${status}</span></summary><div class="optbody">${inner}</div></details>`;
+}
+/* Extra evidence about you that can change the job list: job history, hobbies, friends' views. */
+function extrasSection(P, D){
+  const roles=(S.roles||[]).filter(r=>r.t||r.types.length), hb=(S.hobbies||[]).filter(h=>h.t||h.types.length), fr=P.friends;
+  const T=testedOnly(), on=x=>T?'off (tested only)':x?'counting':'not counting';
+  const inDir=types=>types.some(t=>t===D.top[0]||t===D.top[1]);
+  const hist = foldPanel('x-history','Job history', roles.length, `${roles.length} role${roles.length>1?'s':''} \u00b7 ${on(S.useHistory)}`,
+    roles.length ? `<div class="actions">${roles.map(r=>{ const v=roleVerdict(r);
+        return `<div class="panel sub"><div class="eyebrow">${esc(v.label)}</div><h3>${esc(r.t||'Unnamed role')}</h3>
+          ${r.types.length?`<p class="muted">Mostly ${r.types.map(t=>TYPES[t].name).join(' and ')} work. ${inDir(r.types)?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}
+          ${v.text?`<p>${esc(v.text)}</p>`:''}</div>`; }).join('')}</div>
+        <p class="muted" style="font-size:14px;margin:0">${S.useHistory&&!T?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Also count.'}</p>
+        <div class="cta-row">${roles.length<3?`<button class="btn ghost sm" data-act="role-new">+ Add a role</button>`:''}<button class="btn ghost sm" data-act="role-edit">Edit roles</button></div>`
+      : `<p>Up to three jobs or big roles you\u2019ve had, paid or not. Ones you enjoyed and did well can lift similar work in your list, if you switch that on.</p><div><button class="btn ghost sm" data-act="role-new">+ Add a role</button></div>`);
+  const hobs = foldPanel('x-hobbies','Hobbies and side projects', hb.length, `${hb.length} added \u00b7 ${on(S.useHobbies!==false)}`,
+    hb.length ? `<div class="actions">${hb.map(h=>`<div class="panel sub"><div class="eyebrow">${h.love!=null?esc(LOVE[h.love]):'Not rated'}</div><h3>${esc(h.t||'Unnamed hobby')}</h3>
+          ${h.types.length?`<p class="muted">Mostly ${h.types.map(t=>TYPES[t].name).join(' and ')}. ${inDir(h.types)?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}</div>`).join('')}</div>
+        <p class="muted" style="font-size:14px;margin:0">${S.useHobbies!==false&&!T?'Adjusting your ranking: hobbies you love nudge your interests toward that kind of work.':'Not adjusting your ranking. Switch it on in the Filter panel under Also count.'}</p>
+        <div class="cta-row">${hb.length<3?`<button class="btn ghost sm" data-act="hobby-new">+ Add a hobby</button>`:''}<button class="btn ghost sm" data-act="hobby-edit">Edit hobbies</button></div>`
+      : `<p>Up to three things you do for the love of it. They nudge your interests toward that kind of work.</p><div><button class="btn ghost sm" data-act="hobby-new">+ Add a hobby</button></div>`);
+  const friends = foldPanel('opt-friend','Friends\u2019 views', fr.length, `${fr.length} added \u00b7 ${T?'comparison only':S.useFriends!==false?'counting':'comparison only'}`,
+    (fr.length ? `<p class="muted" style="margin:0">${fr.map(f=>esc(f.name)).join(' and ')} ${fr.length>1?'are':'is'} the hollow dots in How you run. ${S.useFriends!==false&&!T?'Their view is also averaged into the personality part of your matches, which is a small part.':'Their view is there to compare with yours. It doesn\u2019t change your matches.'}</p>
+        ${fr.filter(f=>f.text).map(f=>`<div class="panel sub"><div class="eyebrow">${esc(f.name)} says you\u2019re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}
+        <div class="lbl">Ask someone else</div>`
+      : `<p>Someone who knows you well rates how you come across. Their view shows beside yours in How you run.</p>`) + friendInvite());
+  return `<section class="section" id="extras"><h2>What else counts</h2>
+    <p class="muted" style="margin:0">Extra evidence about you. Each one can be switched on or off in the Filter panel below.</p>
+    <div class="actions">${hist}${hobs}${friends}</div></section>`;
+}
 function historySection(P, D){
   const roles=(S.roles||[]).filter(r=>r.t || r.types.length);
   if(!roles.length) return '';
@@ -958,9 +998,6 @@ function historySection(P, D){
 function results(){
   const P = profile(S), D = directionOf(P), scored = scoreJobs(P, S); LAST = scored;
   const name = S.name ? esc(S.name)+'’s' : 'Your';
-  const friendsHtml = P.friends.length ? `<section class="section"><h2>How others see you</h2>
-    <p class="muted" style="margin:0">The hollow dots below are from ${P.friends.map(f=>esc(f.name)).join(' and ')}. Their view is there to compare with yours. ${S.useFriends!==false&&!testedOnly()?'It’s also averaged into the personality part of your matches, which is a small part. Switch it off in the Filter panel.':'It doesn’t change your matches.'}</p>
-    ${P.friends.filter(f=>f.text).map(f=>`<div class="panel"><div class="eyebrow">${esc(f.name)} says you’re better than you realise at</div><p style="margin:0;font-size:19px">${esc(f.text)}</p></div>`).join('')}</section>` : '';
   const sCount = scored.filter(o=>o.tier==='S').length;
 
   return `<main class="wide">
@@ -984,8 +1021,7 @@ function results(){
     <p style="margin:0">Turn on the AI coach and add a few lines in your own words (about 3 minutes). You\u2019ll get a prompt that gives any AI chat the full picture, so it can talk through your direction, the tensions in your answers, and a plan to get there.</p>
     <p class="muted" style="margin:0;font-size:14px">Nothing is sent from this app. You choose where to paste it. Your matches stay the same either way.</p>
     <div class="cta-row"><button class="btn" data-act="ai-offer-yes">Turn on and add my words</button><button class="btn ghost" data-act="ai-offer-no">No thanks</button></div></div></section>` : ''}
-  ${friendsHtml}
-  ${historySection(P, D)}
+  ${extrasSection(P, D)}
   <section class="section"><div class="cta-row" style="justify-content:space-between"><h2>Your heading</h2>
     <div class="toggle" role="group" aria-label="View"><button data-act="view" data-v="tiers" aria-pressed="${S.view==='tiers'}">By match</button><button data-act="view" data-v="fields" aria-pressed="${S.view==='fields'}">By field</button></div></div>
     <p class="muted" style="margin:0">Tap a job for why it fits, a day in the life, pay and live listings. ${testedOnly()?'Tested methods only: your story answers and history aren’t used. ':'Includes your story answers and other untested extras (see How this works). '}${!testedOnly()&&S.useHobbies!==false&&(S.hobbies||[]).some(h=>h.types.length)?'Your hobbies are adjusting this ranking. ':''}${S.useHistory&&!testedOnly()?'Your past roles are adjusting this ranking.':(S.expSkipped||S.exp.q===null?'Your job history wasn’t used.':'Your experience only adds the readiness notes. It didn’t change the order.')}${sCount===0?' Nothing stood far enough ahead to be a top match, which is common for all-rounders.':''}</p>
@@ -999,14 +1035,6 @@ function results(){
   ${shortlistSection()}
   <section class="section"><h2>Optional next steps</h2><div class="actions">
     ${optPanel('opt-refine','In your own words', S.refineDone, 'Answered', `<p>${S.refineDone?'You can change your answers any time.':`About ${minsOf(refineScreens())} more minutes: a few questions in your own words and one about what wears you out.`} It doesn’t change your matches, but it gives you and the AI coach more to work with.</p><button class="btn${S.refineDone?' ghost':''}" data-act="refine">${S.refineDone?'Edit my answers':'Start'}</button>`)}
-    ${optPanel('opt-friend','Ask a friend', (S.friends||[]).length>0, `${(S.friends||[]).length} added`, `${(S.friends||[]).length?`<p class="muted" style="margin:0">Added: ${S.friends.map(f=>esc(f.data.by||'a friend')).join(', ')}. You can ask someone else too.</p>`:''}${LINKS
-      ? `<p>Send an invite to someone who knows you well. They answer about ${minsOf(friendScreens())} minutes of questions about you, then send their answers back to you.</p>
-         <label class="eyebrow" for="reply-in">Your email, so their answers come straight back to you (optional)</label>
-         <input id="reply-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(S.replyEmail||'')}">
-         <button class="btn" data-act="share-invite">Send an invite</button>
-         <details class="saymore"><summary>Got a code instead?</summary><textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button></details>`
-      : `<p>Send someone who knows you well the app. They choose “Describe a friend”, answer about you, and send you a code. Paste it here.</p>
-      <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}`)}
     ${aiPanel()}
     ${optPanel('opt-share','Keep or share', !!S.kept, 'Saved', `<p>Share a picture of your bearing to messages, socials or email. The code holds all your answers: paste it into Bearing on any device to reopen these results.</p>
       <div class="cta-row"><button class="btn ghost sm" data-act="share-snap">${SHARE_ICON}Share my Bearing</button><button class="btn ghost sm" data-act="copy-profile">Copy code</button></div>`)}
@@ -1139,12 +1167,14 @@ async function onClick(e){
     case 'gut': { const gp=gutPair(); S.gut={ out:gp.out, alt:gp.alt, ans:+v }; save(); render(); break; }
     case 'narrow-done': S.phase='results'; save(); render(); { const el=document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); } toast('Shortlist ranked'); break;
     case 'short-copy': { if(!SET.ai){ SET.ai=true; saveSet(); } copyText(aiPrompt(), null); S.aiCopied=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
+    case 'role-new': grabText(); if((S.roles||[]).length<3) S.roles.push({t:'',types:[],good:null,enjoy:null}); S.phase='roleedit'; S.idx=0; save(); render(); break;
+    case 'hobby-new': grabText(); S.hobbies=S.hobbies||[]; if(S.hobbies.length<3) S.hobbies.push({t:'',types:[],love:null}); S.phase='hobbyedit'; S.idx=0; save(); render(); break;
     case 'role-edit': S.phase='roleedit'; S.idx=0; save(); render(); break;
-    case 'role-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
+    case 'role-done': grabText(); S.roles=S.roles.filter(r=>r.t.trim()||r.types.length); S.phase='results'; save(); render(); toast('Results updated'); break;
     case 'friends-use': { S.useFriends=S.useFriends===false; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useFriends?'Friends\u2019 ratings now count':'Friends\u2019 ratings shown for comparison only'); break; }
     case 'friend-jump': { const el=document.getElementById('opt-friend'); if(el){ el.scrollIntoView({behavior:'smooth',block:'start'}); el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); } break; }
     case 'hobby-edit': S.phase='hobbyedit'; S.idx=0; save(); render(); break;
-    case 'hobby-done': grabText(); S.phase='results'; save(); render(); toast('Results updated'); break;
+    case 'hobby-done': grabText(); S.hobbies=S.hobbies.filter(h=>h.t.trim()||h.types.length); S.phase='results'; save(); render(); toast('Results updated'); break;
     case 'hobbies-use': { S.useHobbies=!S.useHobbies; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHobbies?'Hobbies now adjust the ranking':'Ranking ignores your hobbies'); break; }
     case 'history': { S.useHistory=!S.useHistory; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(S.useHistory?'History now adjusts the ranking':'Ranking ignores your history'); break; }
     case 'skill': { const i=S.exp.skills.indexOf(v); if(i>=0) S.exp.skills.splice(i,1); else S.exp.skills.push(v); save(); render(); break; }
