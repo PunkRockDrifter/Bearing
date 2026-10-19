@@ -411,6 +411,7 @@ function settings(){
           ${[['system','Match phone',ICON_SYS],['light','Light',ICON_SUN],['dark','Dark',ICON_MOON]].map(([v,l,ic])=>`<button role="radio" data-act="set-theme" data-v="${v}" aria-checked="${t===v}">${ic}<span>${l}</span></button>`).join('')}
         </div></div>
       <div class="set-row"><div><div class="set-name">Tested methods only</div><div class="set-sub">Matches use only the published, tested measures (the O*NET Interest Profiler and O*NET job data). Leaves out your story answers, job history, personality fit and Bearing\u2019s own job descriptions. Off gives a fuller read; on gives the stricter one.</div></div>${sw('set-tested',!!SET.testedOnly,'Tested methods only')}</div>
+      <div class="set-row"><div><div class="set-name">Warn before leaving the app</div><div class="set-sub">Job listings, videos and course searches open outside Bearing. Shows a short note first.</div></div>${sw('set-leave',!SET.noLeaveWarn,'Warn before leaving the app')}</div>
       <div class="set-row"><div><div class="set-name">AI coach</div><div class="set-sub">Adds a button to your results that packages them into a prompt for any AI chat. Nothing is sent from this app; you choose where to paste it.</div></div>${sw('set-ai',!!SET.ai,'AI coach')}</div>
       ${FEEDBACK_ON ? `<div class="set-row"><div><div class="set-name">Ask me for feedback</div><div class="set-sub">Shows a short “Did this hit the mark?” card on your results. Nothing is sent unless you press Send.${(SET.submissions||[]).length ? ` Feedback you’ve sent: ${SET.submissions.map(x=>`<b class="mono">${esc(x)}</b>`).join(', ')}. To have one deleted, quote its ID using the contact details in the privacy policy.`:''}</div></div>${sw('set-fb',!SET.noFeedback,'Ask me for feedback')}</div>` : ''}
       ${deferredInstall ? `<div class="set-row"><div><div class="set-name">Install the app</div><div class="set-sub">Adds Bearing to your home screen. It works offline.</div></div><button class="btn ghost sm" data-act="install">Install</button></div>` : ''}
@@ -906,6 +907,19 @@ function shortPrompt(){
 - Work out realistic first steps from where I am now. Ask me what you need to know about my money, time and situation rather than guessing.`);
   return L.join('\n');
 }
+function leaveDialog(href, site){
+  closeLeave(); const back=document.activeElement;
+  const el=document.createElement('div'); el.className='leave'; el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-labelledby','leave-h');
+  el.innerHTML=`<div class="leave-card"><h3 id="leave-h">You’re leaving Bearing</h3>
+    <p>This opens <b>${esc(site)}</b> in your browser. It isn’t part of Bearing, so what you find there (listings, videos or courses) may not match your results, and Bearing can’t vouch for it.</p>
+    <label class="leave-tick"><input type="checkbox" id="leave-never"> Don’t warn me again</label>
+    <div class="cta-row"><a class="btn" href="${esc(href)}" target="_blank" rel="noopener" data-leave="go">Open ${esc(site)}</a><button class="btn ghost" data-leave="stay">Stay here</button></div></div>`;
+  const done=()=>{ const n=document.getElementById('leave-never'); if(n&&n.checked){ SET.noLeaveWarn=true; saveSet(); } closeLeave(); if(back&&back.focus) back.focus(); };
+  el.addEventListener('click', e=>{ const t=e.target.closest('[data-leave]'); if(t){ if(t.dataset.leave==='stay') e.preventDefault(); setTimeout(done,0); } else if(e.target===el) done(); });
+  el.addEventListener('keydown', e=>{ if(e.key==='Escape') done(); });
+  document.body.appendChild(el); el.querySelector('[data-leave="go"]').focus();
+}
+function closeLeave(){ document.querySelectorAll('.leave').forEach(x=>x.remove()); }
 function rankSwitches(){
   const hb=(S.hobbies||[]).filter(h=>h.types.length), roles=(S.roles||[]).filter(r=>r.t||r.types.length), fr=S.friends||[];
   if(testedOnly()) return `<div class="frow"><span class="eyebrow">Also count</span><span class="muted" style="font-size:14px">Hobbies, job history and friends’ ratings are off because Tested methods only is on in Settings.</span></div>`;
@@ -1157,6 +1171,7 @@ async function onClick(e){
     case 'set-fb': SET.noFeedback=!SET.noFeedback; saveSet(); render(); break;
     case 'set-theme': SET.theme=v; saveSet(); applyTheme(); render(); break;
     case 'set-tested': SET.testedOnly=!SET.testedOnly; saveSet(); render(); toast(SET.testedOnly?'Tested methods only':'Fuller read: untested extras included'); break;
+    case 'set-leave': SET.noLeaveWarn=!SET.noLeaveWarn; saveSet(); render(); break;
     case 'set-ai': SET.ai=!SET.ai; saveSet(); render(); toast(SET.ai?'AI coach turned on':'AI coach turned off'); break;
     case 'delete-ask': S._confirmDelete=true; render(); break;
     case 'delete-cancel': S._confirmDelete=false; render(); break;
@@ -1220,6 +1235,10 @@ function boot(){
     darkQuery.addEventListener ? darkQuery.addEventListener('change',onChange) : darkQuery.addListener(onChange); }
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall=e; if(S.phase==='settings') render(); });
   if(S.phase==='quick' || S.phase==='refine' || S.phase==='friend'){ /* resume mid-flow */ }
+  // Outside links (jobs, videos, courses): say you're leaving the app first, unless turned off in Settings.
+  document.addEventListener('click', e=>{ const l=e.target.closest('a[href^="http"]'); if(!l || l.closest('.leave') || SET.noLeaveWarn) return;
+    let u; try{ u=new URL(l.href); }catch(_){ return; } if(u.host===location.host) return;
+    e.preventDefault(); e.stopPropagation(); leaveDialog(l.href, u.host.replace(/^www\./,'')); }, true);
   document.addEventListener('click', e=>{ const b=e.target.closest('[data-act="resume"]'); if(b){ S.phase=S.resumePhase||'quick'; save(); render(); return; } _onClick(e); });
   document.addEventListener('input', e=>{ if(e.target.id==='minpay'){ S.minPay=+e.target.value; document.getElementById('board').innerHTML=board(); refreshFilters(); } });
   document.addEventListener('toggle', e=>{ if(e.target.id==='filters'){ S.filtersOpen=e.target.open; save(); } }, true);

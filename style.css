@@ -402,3 +402,13 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .shortlist li.top2 .rankno{color:var(--brg-accent)}
 .jobchip .star{color:var(--brg-accent)}
 .nq{font-size:18px;margin-bottom:8px}
+
+/* Leaving-the-app note for outside links */
+.leave{position:fixed;inset:0;z-index:50;display:grid;place-items:end center;padding:16px;background:rgb(0 0 0 / .45)}
+.leave-card{width:min(520px,100%);background:var(--brg-surface);color:var(--brg-ink);border:1px solid var(--brg-line-strong);border-radius:var(--brg-radius);padding:20px;display:grid;gap:12px;margin-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+.leave-card h3{margin:0}
+.leave-card p{margin:0}
+.leave-tick{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--brg-ink-2)}
+.leave-tick input{width:20px;height:20px;accent-color:var(--brg-accent)}
+.leave-card .btn{text-decoration:none;text-align:center}
+@media (min-width:640px){.leave{place-items:center}}
