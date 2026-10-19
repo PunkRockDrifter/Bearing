@@ -91,8 +91,8 @@ function buildFeedback(){
       stories:S.stories, stories_also:S.stories2||{}, activities:S.mip||{}, values:S.values||[], work_from_home:S.wfh, ratings:S.ipip,
       refine: S.refineDone ? { drain:S.refine.drain, tags:Object.fromEntries(Object.entries(S.refine.deep).map(([k,d])=>[k,d.tags])) } : null,
       experience: S.expSkipped||S.exp.q===null ? null : { qual:S.exp.q, skills:S.exp.skills },
-      roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy })),
-      history_used: !!S.useHistory && !testedOnly(), hobbies:(S.hobbies||[]).map(h=>({ types:h.types, love:h.love })), hobbies_used: S.useHobbies!==false && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length, friends_used: S.useFriends!==false && !testedOnly(),
+      roles: (S.roles||[]).map(r=>({ types:r.types, good:r.good, enjoy:r.enjoy, field:r.f||null })),
+      history_used: !!S.useHistory && !testedOnly(), hobbies:(S.hobbies||[]).map(h=>({ types:h.types, love:h.love, field:h.f||null })), hobbies_used: S.useHobbies!==false && !testedOnly(), tested_only: testedOnly(), friends_added:(S.friends||[]).length, friends_used: S.useFriends!==false && !testedOnly(),
       filters:{ min_pay:S.minPay||0, max_training:S.maxQ??4 },
       shortlist: shortRanked().map(t=>({ t, a:(S.narrow||{})[t]||null })), tiers:{ S:sc.filter(o=>o.tier==='S').map(o=>o.j.t), A:sc.filter(o=>o.tier==='A').map(o=>o.j.t), B:sc.filter(o=>o.tier==='B').map(o=>o.j.t) }
     };
@@ -288,6 +288,11 @@ function reasons(o, P, topTypes){
   }
   return { why, watch: watch.slice(0,3), not };
 }
+/* Past roles and hobbies in a job's own field count as experience toward it. */
+function fieldExperience(j, st){
+  const roles=(st.roles||[]).filter(r=>r.f===j.f && (r.t||'').trim()), hobs=(st.hobbies||[]).filter(h=>h.f===j.f && (h.t||'').trim() && h.love!==0);
+  return { roles, hobs, any: roles.length+hobs.length>0 };
+}
 function readiness(j, st){
   if(st.expSkipped || st.exp.q===null || st.exp.q===undefined) return null;
   const carry = j.sk.filter(s=>st.exp.skills.includes(s));
@@ -295,7 +300,8 @@ function readiness(j, st){
   const q=effQ(st.exp.q, st.exp.qf, j);
   if(q>=j.q && carry.length>=1) lvl=0;
   else if(j.q-q<=1 || carry.length>=2) lvl=1;
-  return { lvl, carry: carry.map(s=>SKILLS.find(x=>x[0]===s)[1]) };
+  const fx=fieldExperience(j, st); if(fx.any && lvl>0) lvl--;
+  return { lvl, carry: carry.map(s=>SKILLS.find(x=>x[0]===s)[1]).concat(fx.roles.map(r=>'your time as '+r.t.trim()), fx.hobs.map(h=>h.t.trim()+' (side project)')) };
 }
 function directionOf(P){
   const top = ORDER.slice().sort((a,b)=>P.rel[b]-P.rel[a]);
@@ -564,6 +570,7 @@ function question(){
         <p class="hint" style="font-size:17px">Up to three jobs or big roles you\u2019ve had, paid or not. These won\u2019t change your ranking unless you switch them on in the results filters.</p></section>
         ${roles.map((r,i)=>`<div class="panel role"><div class="cta-row" style="justify-content:space-between"><label class="eyebrow" for="role-${i}">Role ${i+1}</label><button class="linkbtn" data-act="role-del" data-v="${i}">Remove</button></div>
           <input id="role-${i}" type="text" value="${esc(r.t)}" placeholder="e.g. Warehouse supervisor, school canteen volunteer">
+          <label class="eyebrow" for="role-f-${i}">What field is it in? (optional)</label><select id="role-f-${i}" class="fieldsel"><option value="">Not sure or skip</option>${QFIELDS.map(([k,l])=>`<option value="${k}" ${r.f===k?'selected':''}>${esc(l)}</option>`).join('')}</select>
           <div class="eyebrow">What did it mostly involve? Pick up to two.</div><div class="chips">${ORDER.map(t=>`<button class="chipbtn" data-act="role-type" data-id="${i}" data-v="${t}" aria-pressed="${r.types.includes(t)}">${DEEP_TAGS[t]}</button>`).join('')}</div>
           <div class="grid2" style="gap:12px"><div><div class="eyebrow">Were you good at it?</div><div class="chips" style="margin-top:6px">${GOOD.map((g,k)=>`<button class="chipbtn" data-act="role-good" data-id="${i}" data-v="${k}" aria-pressed="${r.good===k}">${g}</button>`).join('')}</div></div>
             <div><div class="eyebrow">Did you enjoy it?</div><div class="chips" style="margin-top:6px">${ENJOY.map((g,k)=>`<button class="chipbtn" data-act="role-enjoy" data-id="${i}" data-v="${k}" aria-pressed="${r.enjoy===k}">${g}</button>`).join('')}</div></div></div></div>`).join('')}
@@ -575,6 +582,7 @@ function question(){
         <p class="hint" style="font-size:17px">Up to three things you do for the love of it. What you choose to do in your own time says a lot about the work you\u2019d enjoy. You can switch this on or off in the results filters.</p></section>
         ${hb.map((h,i)=>`<div class="panel role hobby"><div class="cta-row" style="justify-content:space-between"><label class="eyebrow" for="hobby-${i}">Hobby ${i+1}</label><button class="linkbtn" data-act="hobby-del" data-v="${i}">Remove</button></div>
           <input id="hobby-${i}" type="text" value="${esc(h.t)}" placeholder="e.g. building robots, making music, coding small AI tools">
+          <label class="eyebrow" for="hobby-f-${i}">What field is it in? (optional)</label><select id="hobby-f-${i}" class="fieldsel"><option value="">Not sure or skip</option>${QFIELDS.map(([k,l])=>`<option value="${k}" ${h.f===k?'selected':''}>${esc(l)}</option>`).join('')}</select>
           <div class="eyebrow">What does it mostly involve? Pick up to two.</div><div class="chips">${ORDER.map(t=>`<button class="chipbtn" data-act="hobby-type" data-id="${i}" data-v="${t}" aria-pressed="${h.types.includes(t)}">${DEEP_TAGS[t]}</button>`).join('')}</div>
           <div class="eyebrow">How much do you love it?</div><div class="chips" style="margin-top:6px">${LOVE.map((g,k)=>`<button class="chipbtn" data-act="hobby-love" data-id="${i}" data-v="${k}" aria-pressed="${h.love===k}">${g}</button>`).join('')}</div></div>`).join('')}
         ${hb.length<3 ? `<button class="btn ghost" data-act="hobby-add" style="width:fit-content">+ Add a hobby</button>` : ''}
@@ -871,7 +879,10 @@ function studyEstimate(j){
   const q=qNow(); if(q===null||q===undefined) return null;
   const f=qFieldNow(), fit=fieldFit(f,j), e=effQ(q,f,j), fname=f&&FIELDS[f]?FIELDS[f].name:'';
   const carry=j.sk.filter(s=>(S.exp.skills||[]).includes(s)).map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase());
-  const extra = carry.length ? ` Skills that carry over: ${carry.join(', ')}.` : '';
+  const fx=fieldExperience(j, S);
+  const extra = (carry.length ? ` Skills that carry over: ${carry.join(', ')}.` : '')
+    + (fx.roles.length ? ` Your time as ${fx.roles.map(r=>r.t.trim()).join(' and ')} counts as experience in this field.` : '')
+    + (fx.hobs.length ? ` ${fx.hobs.map(h=>h.t.trim()).join(' and ')} counts as experience here too; a portfolio of it may get you in sooner.` : '');
   const diff = q>0 && fit!=='same' ? `Your qualification (${fname}) is in ${fit==='near'?'a nearby':'a different'} field, so it counts for less here. ` : '';
   if(e>=j.q) return q>=j.q && fit==='same' ? `You already have the level of qualification usually asked for. The gap is mostly experience, a short course or a portfolio.${extra}`
     : fit==='near' ? `${diff}Your level of study is usually enough, but expect a short course or some experience in this area first.${extra}`
@@ -986,14 +997,14 @@ function extrasSection(P, D){
   const inDir=types=>types.some(t=>t===D.top[0]||t===D.top[1]);
   const hist = foldPanel('x-history','Job history', roles.length, `${roles.length} role${roles.length>1?'s':''} \u00b7 ${on(S.useHistory)}`,
     roles.length ? `<div class="actions">${roles.map(r=>{ const v=roleVerdict(r);
-        return `<div class="panel sub"><div class="eyebrow">${esc(v.label)}</div><h3>${esc(r.t||'Unnamed role')}</h3>
+        return `<div class="panel sub"><div class="eyebrow">${esc(v.label)}</div><h3>${esc(r.t||'Unnamed role')}</h3>${r.f&&FIELDS[r.f]?`<div class="muted" style="font-size:14px">${esc(FIELDS[r.f].name)}</div>`:''}
           ${r.types.length?`<p class="muted">Mostly ${r.types.map(t=>TYPES[t].name).join(' and ')} work. ${inDir(r.types)?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}
           ${v.text?`<p>${esc(v.text)}</p>`:''}</div>`; }).join('')}</div>
         <p class="muted" style="font-size:14px;margin:0">${S.useHistory&&!T?'Adjusting your ranking: work you enjoyed and did well gets a boost, and work you were good at but disliked gets marked down.':'Not adjusting your ranking. Switch it on in the Filter panel under Filter by.'}</p>
         <div class="cta-row">${roles.length<3?`<button class="btn ghost sm" data-act="role-new">+ Add a role</button>`:''}<button class="btn ghost sm" data-act="role-edit">Edit roles</button></div>`
       : `<p>Up to three jobs or big roles you\u2019ve had, paid or not. Ones you enjoyed and did well can lift similar work in your list, if you switch that on.</p><div><button class="btn ghost sm" data-act="role-new">+ Add a role</button></div>`);
   const hobs = foldPanel('x-hobbies','Hobbies and side projects', hb.length, `${hb.length} added \u00b7 ${on(S.useHobbies!==false)}`,
-    hb.length ? `<div class="actions">${hb.map(h=>`<div class="panel sub"><div class="eyebrow">${h.love!=null?esc(LOVE[h.love]):'Not rated'}</div><h3>${esc(h.t||'Unnamed hobby')}</h3>
+    hb.length ? `<div class="actions">${hb.map(h=>`<div class="panel sub"><div class="eyebrow">${h.love!=null?esc(LOVE[h.love]):'Not rated'}</div><h3>${esc(h.t||'Unnamed hobby')}</h3>${h.f&&FIELDS[h.f]?`<div class="muted" style="font-size:14px">${esc(FIELDS[h.f].name)}</div>`:''}
           ${h.types.length?`<p class="muted">Mostly ${h.types.map(t=>TYPES[t].name).join(' and ')}. ${inDir(h.types)?'That lines up with your direction.':'That sits outside your direction.'}</p>`:''}</div>`).join('')}</div>
         <p class="muted" style="font-size:14px;margin:0">${S.useHobbies!==false&&!T?'Adjusting your ranking: hobbies you love nudge your interests toward that kind of work.':'Not adjusting your ranking. Switch it on in the Filter panel under Filter by.'}</p>
         <div class="cta-row">${hb.length<3?`<button class="btn ghost sm" data-act="hobby-new">+ Add a hobby</button>`:''}<button class="btn ghost sm" data-act="hobby-edit">Edit hobbies</button></div>`
@@ -1108,9 +1119,9 @@ MY RESULTS`);
   if(S.refine.drain && S.refine.drain.length) L.push('What drains me fastest: '+S.refine.drain.map(t=>DRAIN[t].toLowerCase()).join('; ')+'.');
   P.friends.forEach(f=>{ const fb=f.rel?bearingOf(f.rel):null; L.push(`\nFriend's view (${f.name}):${f.text?` They say I'm better than I realise at: "${f.text}".`:''}`); });
   const roles=(S.roles||[]).filter(r=>r.t||r.types.length);
-  if(roles.length) L.push('\nPast roles (judge these as evidence about what I enjoy and do well, not as a track to stay on):\n'+roles.map(r=>{ const v=roleVerdict(r); return `- ${r.t||'Unnamed role'}: mostly ${r.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'} work; good at it: ${r.good!=null?GOOD[r.good].toLowerCase():'?'}; enjoyed it: ${r.enjoy!=null?ENJOY[r.enjoy].toLowerCase():'?'} (${v.label.toLowerCase()})`; }).join('\n'));
+  if(roles.length) L.push('\nPast roles (judge these as evidence about what I enjoy and do well, not as a track to stay on):\n'+roles.map(r=>{ const v=roleVerdict(r); return `- ${r.t||'Unnamed role'}${r.f&&FIELDS[r.f]?` (${FIELDS[r.f].name})`:''}: mostly ${r.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'} work; good at it: ${r.good!=null?GOOD[r.good].toLowerCase():'?'}; enjoyed it: ${r.enjoy!=null?ENJOY[r.enjoy].toLowerCase():'?'} (${v.label.toLowerCase()})`; }).join('\n'));
   const hobbies=(S.hobbies||[]).filter(h=>h.t||h.types.length);
-  if(hobbies.length) L.push('\nHobbies and side projects (what I choose to do for the love of it):\n'+hobbies.map(h=>`- ${h.t||'Unnamed'}: mostly ${h.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'}; ${h.love!=null?LOVE[h.love].toLowerCase():'?'}`).join('\n'));
+  if(hobbies.length) L.push('\nHobbies and side projects (what I choose to do for the love of it):\n'+hobbies.map(h=>`- ${h.t||'Unnamed'}${h.f&&FIELDS[h.f]?` (${FIELDS[h.f].name})`:''}: mostly ${h.types.map(t=>TYPES[t].name).join(' and ')||'unspecified'}; ${h.love!=null?LOVE[h.love].toLowerCase():'?'}`).join('\n'));
   if(!S.expSkipped && S.exp.q!==null) L.push(`Qualification: ${QUALS[S.exp.q]}${S.exp.qf&&FIELDS[S.exp.qf]?` in ${FIELDS[S.exp.qf].name.toLowerCase()}`:''}. Skills I've used a lot: ${S.exp.skills.map(s=>SKILLS.find(x=>x[0]===s)[1].toLowerCase()).join(', ')||'not given'}.`);
   const tierLine = t => sc.filter(o=>o.tier===t).map(o=>o.j.t).join(', ');
   L.push(`\nQuestionnaire job matches (from a fixed list of ${JOBS.length} Australian jobs, so treat as a starting point):\nTop matches: ${tierLine('S')||'none'}\nStrong matches: ${tierLine('A')||'none'}\nGood matches: ${tierLine('B')||'none'}\nRuled out (unlikely), for contrast: ${sc.filter(o=>o.tier==='D').slice(-6).map(o=>o.j.t).join(', ')}`);
@@ -1131,8 +1142,8 @@ function grabText(){
   const nmEl=document.getElementById('nm'); if(nmEl) S.name=nmEl.value.trim().slice(0,40);
   STORIES.forEach(s=>{ const el=document.getElementById('st-'+s.id); if(el) S.storyText[s.id]=el.value.slice(0,1000); });
   DEEP.forEach(d=>{ const el=document.getElementById('dp-'+d.id); if(el){ const cur=S.refine.deep[d.id]||{text:'',tags:[]}; cur.text=el.value.slice(0,1500); S.refine.deep[d.id]=cur; } });
-  (S.roles||[]).forEach((r,i)=>{ const el=document.getElementById('role-'+i); if(el) r.t=el.value.slice(0,80); });
-  (S.hobbies||[]).forEach((h,i)=>{ const el=document.getElementById('hobby-'+i); if(el) h.t=el.value.slice(0,80); });
+  (S.roles||[]).forEach((r,i)=>{ const el=document.getElementById('role-'+i); if(el) r.t=el.value.slice(0,80); const fs=document.getElementById('role-f-'+i); if(fs) r.f=fs.value||null; });
+  (S.hobbies||[]).forEach((h,i)=>{ const el=document.getElementById('hobby-'+i); if(el) h.t=el.value.slice(0,80); const fs=document.getElementById('hobby-f-'+i); if(fs) h.f=fs.value||null; });
   if(F){ const a=document.getElementById('ffor'), b=document.getElementById('fby'), c=document.getElementById('ftx');
     if(a) F.for=a.value.trim().slice(0,40); if(b) F.by=b.value.trim().slice(0,40); if(c) F.text=c.value.slice(0,600); }
 }
@@ -1309,7 +1320,7 @@ function boot(){
   document.addEventListener('click', e=>{ const b=e.target.closest('[data-act="resume"]'); if(b){ S.phase=S.resumePhase||'quick'; save(); render(); return; } _onClick(e); });
   document.addEventListener('input', e=>{ if(e.target.id==='minpay'){ S.minPay=+e.target.value; document.getElementById('board').innerHTML=board(); refreshFilters(); } });
   document.addEventListener('toggle', e=>{ if(e.target.id==='filters'){ S.filtersOpen=e.target.open; save(); } }, true);
-document.addEventListener('change', e=>{ if(e.target.id==='minpay') save();
+document.addEventListener('change', e=>{ if(e.target.id==='minpay') save(); if(e.target.classList && e.target.classList.contains('fieldsel')){ grabText(); save(); }
     if(e.target.id==='fb-include'){ grabFb(); save(); const pre=document.getElementById('fb-preview'); if(pre) pre.textContent=JSON.stringify(buildFeedback(),null,1); } });
   document.addEventListener('input', e=>{ if(e.target.id==='fb-comment'){ grabFb(); const pre=document.getElementById('fb-preview'); if(pre) pre.textContent=JSON.stringify(buildFeedback(),null,1); } });
   window.addEventListener('online', flushQueue); setTimeout(flushQueue, 2000);

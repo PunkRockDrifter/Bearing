@@ -438,3 +438,4 @@ textarea:focus,input[type=text]:focus{border-color:var(--brg-accent);outline:non
 .more-options>summary small{display:block;font-size:15px;color:var(--brg-ink-2);margin-top:2px}
 .more-options .mo-plus{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--brg-ink-2);font-size:22px;line-height:1;flex:none;transition:transform .2s}
 .more-options[open] .mo-plus{transform:rotate(45deg)}
+.fieldsel{width:100%;font:16px var(--brg-font-body);color:var(--brg-ink);background:var(--brg-bg);border:1.5px solid var(--brg-line-strong);border-radius:var(--brg-radius);padding:10px 12px}
