@@ -490,7 +490,6 @@ function intro(){
       <button class="btn" data-act="${primary[0]}">${primary[1]} ${ARROW}</button>
       ${hasResults||inProgress ? `<button class="linkbtn" data-act="start">Start again</button>` : `<div class="time">About ${mins} minutes</div>`}
     </div>
-    <p class="privacy">Everything stays on this device. Nothing is sent anywhere, and no AI is involved unless you opt in. <button class="linkbtn" data-act="settings">Settings</button></p>
     ${S.pendingProfile ? `<div class="card-dashed pending"><div class="kicker">Shared with you</div><h2>You opened someone’s results</h2><p>Opening them replaces the results saved on this device.</p><button class="btn" data-act="open-pending">Open their results</button><button class="btn ghost" data-act="drop-pending" style="margin-top:10px">Not now</button></div>` : ''}
   </section>
   <details class="more-options"><summary><span class="mo-plus" aria-hidden="true">+</span><span><b>Other options</b><small>Describe a friend for them, or reopen results with a code</small></span></summary>
@@ -502,7 +501,8 @@ function intro(){
       <label for="code-in">Paste a results code to reopen results, or a friend’s code to add their view.</label>
       <textarea id="code-in" class="codebox" rows="3" placeholder="BRG-P1… or BRG-F1…"></textarea>
       <button class="btn ghost" data-act="load-code">Load code</button></div>
-  </section></details></main>`;
+  </section></details>
+  <p class="privacy">Everything stays on this device. Nothing is sent anywhere, and no AI is involved unless you opt in. <button class="linkbtn" data-act="settings">Settings</button></p></main>`;
 }
 
 function progressBar(list){
