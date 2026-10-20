@@ -78,6 +78,25 @@ for items in list(COND.values()) + list(PRESS.values()):
         vals = sorted(v[el] for v in cx.values() if el in v)
         pct[el] = lambda x, vals=vals: (sum(1 for y in vals if y < x) + 0.5 * sum(1 for y in vals if y == x)) / len(vals)
 
+# Likely dull or hard parts, in the order of DULL in data.js: (source, element). A job lists those where it sits
+# in the top quarter of all O*NET occupations, strongest first, up to four.
+DULL = [('im','4.A.3.b.6'), ('im','4.A.4.c.1'), ('im','4.A.3.b.1'), ('im','4.A.1.a.2'), ('im','4.A.2.a.3'), ('im','4.A.2.a.2'),
+        ('cx','4.C.3.b.7'), ('cx','4.C.2.d.1.i'), ('cx','4.C.3.b.4'), ('cx','4.C.2.d.1.a'), ('cx','4.C.2.d.1.b'), ('cx','4.C.2.b.1.a'),
+        ('cx','4.C.2.b.1.b'), ('cx','4.C.2.b.1.d'), ('cx','4.C.2.b.1.e'), ('cx','4.C.2.a.1.c'), ('cx','4.C.1.d.2'), ('cx','4.C.2.e.1.d'),
+        ('cx','4.C.3.d.3')]
+def _pctf(src, el):
+    vals = sorted(v[el] for v in src.values() if el in v)
+    return lambda x: (sum(1 for y in vals if y < x) + 0.5 * sum(1 for y in vals if y == x)) / len(vals)
+dpct = [_pctf(cx if s_ == 'cx' else im, el) for s_, el in DULL]
+def dull_vec(code):
+    out = []
+    for (s_, el), f in zip(DULL, dpct):
+        src = (cx if s_ == 'cx' else im)[code]
+        out.append(f(src[el]) if el in src else 0)
+    return out
+def dull_pick(vec):
+    return [i for i in sorted(range(len(vec)), key=lambda i: -vec[i]) if vec[i] >= 0.75][:4]
+
 def conditions(code, spec=COND):
     out = []
     for k, items in spec.items():
@@ -129,6 +148,7 @@ def one(code):
     csrc = code if cx.get(code) and im.get(code) else next((r for r in related.get(code, []) if cx.get(r) and im.get(r)), None)
     d['c'] = conditions(csrc) if csrc else None
     d['pr'] = conditions(csrc, PRESS) if csrc else None
+    d['dv'] = dull_vec(csrc) if csrc else None
     d['wfh'] = can_wfh(csrc) if csrc else None
     if csrc and csrc != code:
         d['csrc'] = f'{csrc} {occ.get(csrc, "")}'
@@ -137,7 +157,7 @@ def one(code):
 def combine(codes):
     parts = [one(c) for c in codes]
     out = {}
-    for k in ('ri', 'v', 'c', 'pr'):
+    for k in ('ri', 'v', 'c', 'pr', 'dv'):
         xs = [p[k] for p in parts if p.get(k)]
         out[k] = [round(mean(col), 2) for col in zip(*xs)] if xs else None
     zs = [p['z'] for p in parts if p['z']]
@@ -162,6 +182,7 @@ for title, (code, fit) in M.items():
     if d.get('vsrc'): e['vsrc'] = d['vsrc']
     if d.get('c'): e['c'] = d['c']
     if d.get('pr'): e['pr'] = [round(x, 1) for x in d['pr']]
+    if d.get('dv'): e['dl'] = dull_pick(d['dv'])
     if d.get('wfh') is not None: e['wfh'] = d['wfh']
     if d.get('csrc'): e['csrc'] = d['csrc']
     entries[title] = e
@@ -176,6 +197,7 @@ print('''/* Job data from O*NET, matched by hand to Bearing's Australian jobs. G
    ri = interests [R,I,A,S,E,C]; z = job zone; v = work values [achievement, independence, recognition,
    relationships, support, working conditions]; vsrc = values borrowed from this related occupation;
    c = working conditions in COND order, -2..2 (percentile among O*NET occupations);
+   dl = likely dull or hard parts (indexes into DULL in data.js), top quarter among O*NET occupations;
    pr = pressure facts [deadlines, mistakes, conflict, responsibility for others], same scale; wfh = can be done from home (0-1);
    csrc = conditions borrowed from this related occupation. */
 const ONET = {''')
@@ -189,6 +211,7 @@ JOBS.forEach(j => {
   j.wfh = (o.wfh === undefined) ? null : o.wfh;
   if (o.c) j.c = o.c;
   j.pr = o.pr || null;
+  j.dl = o.dl || null;
   if (!o.ri) return;
   j.ri = { R:o.ri[0], I:o.ri[1], A:o.ri[2], S:o.ri[3], E:o.ri[4], C:o.ri[5] };
   j.code0 = j.code;

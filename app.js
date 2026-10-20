@@ -483,6 +483,9 @@ function intro(){
       <div class="legend__head kicker"><span>What’s ahead</span><span>6 parts · 2 optional</span></div>
       ${LEGEND.map(([n,name,sub,opt],i)=>{ const st=PS[i+1]||{}; const tag = st.state==='current' ? 'PAUSED HERE' : st.state==='started' ? 'STARTED' : st.state==='done' ? 'DONE' : st.state==='skipped' ? 'SKIPPED' : (opt?'OPTIONAL':''); return `<div class="legend__row${opt?' legend__row--opt':''}${st.state?' legend__row--'+(st.state==='started'?'current':st.state):''}"><span class="legend__num">${st.state==='done'?'&#10003;':n}</span><div><div class="legend__name">${name}</div><div class="legend__sub">${st.note||sub}</div></div>${tag?`<span class="legend__tag">${tag}</span>`:''}</div>`; }).join('')}
     </section>
+    ${hasResults && topTwo().length ? `<section class="toptwo"><div class="kicker">Your top two</div>
+      ${topTwo().map((t,i)=>{ const n=triedCount(t), f=((S.tries||{})[t]||{}).feel; return `<div class="toptwo__row"><span class="rankno">${i+1}</span><div><div class="toptwo__name">${esc(t)}</div><div class="toptwo__bar"><i style="width:${Math.round(100*n/TRY.length)}%"></i></div><small>${n?`${n} of ${TRY.length} try-it steps done`:'Not tried out yet'}${f!==undefined&&f!==null?` · ${FEEL[f].toLowerCase()}`:''}</small></div></div>`; }).join('')}
+      <button class="btn ghost" data-act="go-try">${topTwo().some(t=>triedCount(t))?'Carry on trying them out':'Start trying them out'}</button></section>` : ''}
     <div class="start">
       <button class="btn" data-act="${primary[0]}">${primary[1]} ${ARROW}</button>
       ${hasResults||inProgress ? `<button class="linkbtn" data-act="start">Start again</button>` : `<div class="time">About ${mins} minutes</div>`}
@@ -603,7 +606,7 @@ function question(){
       const all=NQ.every(n=>a[n.k]!==undefined&&a[n.k]!==null);
       body = `<section class="screen"><span class="eyebrow">${esc(FIELDS[j.f].name)}</span><div class="q">${esc(j.t)}</div><p class="hint">${esc(j.day)}</p>
         ${ask(NQ[0], `<div class="links"><a href="${ytLink(j)}" target="_blank" rel="noopener">Watch day-in-the-life videos on YouTube \u2197</a></div>`)}
-        ${ask(NQ[1])}
+        ${ask(NQ[1], dullList(j) ? `<div class="lbl">Likely dull or hard parts</div>${dullList(j)}` : '')}
         ${ask(NQ[2], `<div class="lbl">Pressure in this job</div><ul class="look">${pressureFacts(j).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`)}
         ${ask(NQ[3], est?`<div class="lbl">Rough time to get there</div><p>${esc(est)}</p>`:'')}
         ${ask(NQ[4])}</section>
@@ -768,12 +771,13 @@ function jobDetail(o){
     ${(o.why.not.length||o.why.watch.length) ? `<div><div class="lbl">${o.tier==='S'?'Watch for':'Why it\u2019s not higher'}</div><ul>${o.why.not.concat(o.why.watch).map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
     <div class="cta-row">${(S.short||[]).includes(j.t) ? `<button class="btn ghost sm" data-act="short-del" data-v="${esc(j.t)}">\u2605 On your shortlist (remove)</button>` : (S.short||[]).length>=SHORT_MAX ? `<span class="muted" style="font-size:14px">Your shortlist is full (${SHORT_MAX}). Remove one to add this.</span>` : `<button class="btn sm" data-act="short-add" data-v="${esc(j.t)}">\u2606 Add to shortlist</button>`}</div>
     <div><div class="lbl">A day in the life</div><p>${esc(j.day)}</p><div class="links"><a href="${ytLink(j)}" target="_blank" rel="noopener">Watch day-in-the-life videos on YouTube \u2197</a></div></div>
+    ${dullList(j) ? `<div><div class="lbl">The dull and hard parts</div>${dullList(j)}</div>` : ''}
     <div><div class="lbl">How people get in</div><p>${esc(j.path)}</p></div>
     <div><div class="lbl">Courses that lead here</div><div class="links">
       <a href="https://www.google.com/search?q=${encodeURIComponent((j.cq||COURSE_Q[j.t]||j.t)+' course Australia')}" target="_blank" rel="noopener">Search \u201c${esc(j.cq||COURSE_Q[j.t]||j.t)}\u201d courses \u2197</a>
       ${j.q>=3 ? `<a href="https://www.courseseeker.edu.au/courses?q=${encodeURIComponent(j.cq||COURSE_Q[j.t]||j.t)}" target="_blank" rel="noopener">University courses: Course Seeker \u2197</a>` : `<a href="https://www.yourcareer.gov.au/learn-and-train/courses?q=${encodeURIComponent(j.cq||COURSE_Q[j.t]||j.t)}" target="_blank" rel="noopener">TAFE and VET courses: Your Career \u2197</a>`}</div></div>
     ${j.aka&&j.aka.length ? `<div><div class="lbl">Also advertised as</div><div class="aka">${j.aka.map(a=>`<a href="https://www.seek.com.au/${a.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-jobs/in-All-Australia" target="_blank" rel="noopener">${esc(a)}</a>`).join('')}</div></div>` : ''}
-    <div class="links"><a class="primary" href="https://www.seek.com.au/${slug}-jobs/in-All-Australia" target="_blank" rel="noopener">Live listings on SEEK ↗</a>
+    <div class="links"><a href="https://www.seek.com.au/${slug}-jobs/in-All-Australia" target="_blank" rel="noopener">Live listings on SEEK ↗</a>
       <a href="https://www.jobsandskills.gov.au/data/occupation-and-industry-profiles" target="_blank" rel="noopener">Official pay and outlook ↗</a></div>
     <div><button class="btn ghost sm" data-act="open" data-v="${esc(j.t)}">Close ${esc(j.t)}</button></div></div>`;
 }
@@ -913,7 +917,8 @@ function shortlistSection(){
         <button class="linkbtn" data-act="short-del" data-v="${esc(t)}" aria-label="Remove ${esc(t)}">Remove</button></li>`; }).join('')}</ol>
     ${gutNote?`<p>${gutNote}</p>`:''}
     <div class="cta-row">${r.length>=2 ? `<button class="btn" data-act="narrow">${done?'Change my answers':'Compare and narrow down'}</button>` : `<span class="muted">Add at least one more job to compare.</span>`}</div>
-    ${r.length>=2 ? `<p class="muted" style="margin:0;font-size:15px">Next: <b>Take it further with AI coach</b> below, which includes your ranked shortlist.</p>` : ''}</section>`;
+    ${tryOut()}
+    ${r.length>=2 ? `<p class="muted" style="margin:0;font-size:15px">For help with any of this, use <b>Take it further with AI coach</b> below. It includes your ranked shortlist${topTwo().length?' and how trying them out is going':''}.</p>` : ''}</section>`;
 }
 function aiPanel(){
   const r=shortRanked(), done=r.filter(t=>narrowScore(t)!==null).length, hasShort=r.length>=2;
@@ -932,7 +937,30 @@ function aiPanel(){
   const title = `<div class="headpair"><span class="eyebrow">Take it further with</span><h3>AI coach</h3></div>`;
   return S.aiCopied
     ? `<details class="panel optdone" id="ai-panel"><summary><span class="tick" aria-hidden="true">✓</span><span class="optname">AI coach</span><span class="muted">Copied</span></summary><div class="optbody">${inner}</div></details>`
-    : `<div class="panel" id="ai-panel">${title}${inner}</div>`;
+    : `<div class="panel" id="ai-panel"><div class="panelhead"><span class="tick empty" aria-hidden="true"></span>${title}</div>${inner}</div>`;
+}
+function dullList(j){ return j.dl && j.dl.length ? `<ul class="look">${j.dl.map(i=>`<li>${esc(DULL[i])}</li>`).join('')}</ul><p class="muted" style="font-size:13px;margin:4px 0 0">From O*NET data: where this job ranks in the top quarter of all jobs.</p>` : ''; }
+/* After narrowing: small real-world steps to try out each of the top two, ticked off as you go. */
+const TRY = [
+  { k:'watch', t:'Watch three day-in-the-life videos', link:j=>[ytLink(j),'YouTube'] },
+  { k:'ads',   t:'Read five real job ads and note the skills that keep coming up', link:j=>[`https://www.seek.com.au/${(j.sq||j.t).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-jobs/in-All-Australia`,'SEEK'] },
+  { k:'talk',  t:'Find someone who does this job and ask for a 15-minute chat', link:j=>[`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(j.sq||j.t)}`,'LinkedIn'] },
+  { k:'proj',  t:'Do a small weekend project to test the waters (the AI coach can suggest one that suits you)', link:null },
+  { k:'course',t:'Look at one course: what it costs, how long it takes, and whether it can be part time', link:j=>[`https://www.google.com/search?q=${encodeURIComponent((j.cq||COURSE_Q[j.t]||j.t)+' course Australia')}`,'Search courses'] },
+];
+const narrowDone = () => { const r=shortRanked(); return r.length>=2 && r.every(t=>narrowScore(t)!==null) && S.gut && S.gut.ans!==null && S.gut.ans!==undefined; };
+const topTwo = () => narrowDone() ? shortRanked().slice(0,2) : [];
+const triedCount = t => TRY.filter(x=>((S.tries||{})[t]||{})[x.k]).length;
+const FEEL = ['Less keen','About the same','More keen'];
+function tryOut(){
+  const two=topTwo(); if(!two.length) return '';
+  return `<div class="panel" id="tryout"><div class="headpair"><span class="eyebrow">Now what?</span><h3>Try out your top two</h3></div>
+    <p style="margin:0">The best way to know is to get a real taste. Tick these off as you go; it\u2019s saved, and your progress shows on the home page.</p>
+    ${two.map(t=>{ const j=jobOf(t), d=(S.tries||{})[t]||{}, n=triedCount(t);
+      return `<div class="trybox"><div class="tryhead"><b>${esc(t)}</b><span class="muted">${n} of ${TRY.length} done</span></div>
+        <ul class="trylist">${TRY.map(x=>{ const l=x.link?x.link(j):null; return `<li><button class="trycheck" data-act="try" data-id="${esc(t)}" data-v="${x.k}" aria-pressed="${!!d[x.k]}" aria-label="${esc(x.t)}">${d[x.k]?'\u2713':''}</button><span>${esc(x.t)}${l?` <a href="${l[0]}" target="_blank" rel="noopener">${l[1]} \u2197</a>`:''}</span></li>`; }).join('')}</ul>
+        ${n>=3 ? `<div class="nq" style="margin:6px 0 0">So far, how do you feel about ${esc(t)}?</div><div class="chips">${FEEL.map((f,k)=>`<button class="chipbtn sm" data-act="feel" data-id="${esc(t)}" data-v="${k}" aria-pressed="${d.feel===k}">${f}</button>`).join('')}</div>` : ''}</div>`; }).join('')}
+    <p class="muted" style="font-size:14px;margin:0">If one stops appealing, that\u2019s a result too. Go back to your shortlist or the job list and try the next one.</p></div>`;
 }
 function shortPrompt(){
   const r=shortRanked(); if(!r.length) return '';
@@ -940,6 +968,8 @@ function shortPrompt(){
   r.forEach((t,i)=>{ const j=jobOf(t), a=(S.narrow||{})[t]||{}, sc=narrowScore(t);
     L.push(`${i+1}. ${t} ($${j.pay[0]}-${j.pay[1]}k; usual entry: ${QUALS[j.q]})${sc===null?' - not compared yet':''}`);
     L.push(`   Pressure in this job (O*NET data): ${pressureFacts(j).join('; ').toLowerCase()}.`);
+    if(j.dl&&j.dl.length) L.push(`   Likely dull or hard parts (O*NET data): ${j.dl.map(i=>DULL[i].toLowerCase()).join('; ')}.`);
+    const tr=(S.tries||{})[t]; if(tr){ const did=TRY.filter(x=>tr[x.k]).map(x=>x.t.split(' (')[0].toLowerCase()); if(did.length) L.push(`   Tried so far: ${did.join('; ')}.${tr.feel!==undefined&&tr.feel!==null?` Feeling now: ${FEEL[tr.feel].toLowerCase()}.`:''}`); }
     const est=studyEstimate(j); if(est) L.push(`   Rough time to get there from where I am: ${est}`);
     NQ.forEach(n=>{ if(a[n.k]!==undefined&&a[n.k]!==null) L.push(`   ${n.q} -> ${n.o[a[n.k]]}`); }); });
   const g=S.gut; if(g&&g.ans!==null&&g.ans!==undefined) L.push(`Gut check: asked how I'd feel if ${g.alt} replaced ${g.out} in my top two, I said: ${['relieved','no different','disappointed'][g.ans]}.`);
@@ -964,7 +994,7 @@ function leaveDialog(href, site){
 function closeLeave(){ document.querySelectorAll('.leave').forEach(x=>x.remove()); }
 /* An optional step: a full panel until it's done, then a small ticked line that opens again on tap. */
 function optPanel(id, title, done, doneWord, inner){
-  if(!done) return `<div class="panel" id="${id}"><h3>${title}</h3>${inner}</div>`;
+  if(!done) return `<div class="panel" id="${id}"><div class="panelhead"><span class="tick empty" aria-hidden="true"></span><h3>${title}</h3></div>${inner}</div>`;
   return `<details class="panel optdone" id="${id}"><summary><span class="tick" aria-hidden="true">✓</span><span class="optname">${title}</span><span class="muted">${doneWord}</span></summary><div class="optbody">${inner}</div></details>`;
 }
 function rankSwitches(){
@@ -987,7 +1017,7 @@ function friendInvite(){ return `${LINKS
       : `<p>Send someone who knows you well the app. They choose “Describe a friend”, answer about you, and send you a code. Paste it here.</p>
       <textarea id="fcode-in" class="codebox" placeholder="BRG-F1.…"></textarea><button class="btn ghost" data-act="add-friend">Add their view</button>`}`; }
 function foldPanel(id, title, n, status, inner){
-  if(!n) return `<div class="panel" id="${id}"><h3>${title}</h3>${inner}</div>`;
+  if(!n) return `<div class="panel" id="${id}"><div class="panelhead"><span class="tick empty" aria-hidden="true"></span><h3>${title}</h3></div>${inner}</div>`;
   return `<details class="panel optdone" id="${id}"${S.openPanel===id?' open':''}><summary><span class="tick" aria-hidden="true">\u2713</span><span class="optname">${title}</span><span class="muted">${status}</span></summary><div class="optbody">${inner}</div></details>`;
 }
 /* Extra evidence about you that can change the job list: job history, hobbies, friends' views. */
@@ -1192,6 +1222,9 @@ async function onClick(e){
     case 'hobby-del': grabText(); S.hobbies.splice(+v,1); save(); render(); break;
     case 'hobby-type': { grabText(); const h=S.hobbies[+id]; const i=h.types.indexOf(v); if(i>=0) h.types.splice(i,1); else if(h.types.length<2) h.types.push(v); save(); render(); break; }
     case 'hobby-love': grabText(); S.hobbies[+id].love=+v; save(); render(); break;
+    case 'try': { S.tries=S.tries||{}; const d=(S.tries[id]=S.tries[id]||{}); d[v]=!d[v]; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
+    case 'feel': { S.tries=S.tries||{}; const d=(S.tries[id]=S.tries[id]||{}); d.feel = d.feel===+v ? null : +v; save(); const y=window.scrollY; render(); window.scrollTo(0,y); break; }
+    case 'go-try': S.phase='results'; save(); render(); setTimeout(()=>{ const el=document.getElementById('tryout')||document.getElementById('shortlist'); if(el) el.scrollIntoView({block:'start'}); }, 50); break;
     case 'short-add': { S.short=S.short||[]; if(!S.short.includes(v) && S.short.length<SHORT_MAX) S.short.push(v); save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast(`Added to your shortlist (${S.short.length} of ${SHORT_MAX})`); break; }
     case 'short-del': { S.short=(S.short||[]).filter(t=>t!==v); if(S.narrow) delete S.narrow[v]; S.gut=null; save(); const y=window.scrollY; render(); window.scrollTo(0,y); toast('Removed from your shortlist'); break; }
     case 'narrow': S.phase='narrow'; S.idx=0; save(); render(); break;
