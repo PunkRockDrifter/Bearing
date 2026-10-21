@@ -25,7 +25,7 @@ const STORIES = [
            S:'A mentor or close group changing someone’s life for the better.', E:'An underdog building something big, or a crew pulling off a heist.', C:'A careful plan where every piece falls into place.' } },
   { id:'s4', q:'Which of these would you be most likely to write on a sticky note for yourself?',
     none:'None of these sound like me.',
-    opts:{ R:'Get your hands on it and try it.', I:'Question everything.', A:'Make something that wasn’t there before.',
+    opts:{ R:'Roll up your sleeves and build it.', I:'Question everything.', A:'Make something that wasn’t there before.',
            S:'Leave people better than you found them.', E:'Fortune favours the bold.', C:'A place for everything, and everything in its place.' } },
   { id:'s5', q:'Think back to an early memory, around age five to eight, when you were completely absorbed in something. Which is closest?',
     none:'I can’t remember, or none of these fit.',
